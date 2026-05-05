@@ -4,7 +4,7 @@ import csv
 from datetime import datetime
 
 def send_telegram_msg(message, symbol="NIFTY", pattern="UNKNOWN"):
-    """Sends a Telegram message and logs the hit to alerts.csv."""[cite: 6]
+    """Sends a Telegram message and logs the hit to alerts.csv."""
     url = f"https://api.telegram.org/bot{config.TELEGRAM_TOKEN}/sendMessage"
     payload = {
         "chat_id": config.TELEGRAM_CHAT_ID,
