@@ -1,33 +1,48 @@
 import os
 import json
 import config
+from notifier import send_telegram_msg
 
-def get_latest_snapshots(limit=2):
-    """Gets the two most recent files from the snapshots folder."""
+def get_history(limit=100):
+    """Loads the last N snapshots to analyze trends."""
+    # Ensure the folder exists before listing
+    if not os.path.exists(config.SNAPSHOT_FOLDER):
+        return []
+        
     files = [os.path.join(config.SNAPSHOT_FOLDER, f) for f in os.listdir(config.SNAPSHOT_FOLDER)]
-    # Sort files by time (newest first)
     files.sort(key=os.path.getmtime, reverse=True)
-    return files[:limit]
-
-def analyze_patterns():
-    snaps = get_latest_snapshots()
     
-    # We need at least two snapshots to compare "Now" vs "Then"
-    if len(snaps) < 2:
+    history = []
+    for f in files[:limit]:
+        try:
+            with open(f, 'r') as snap_file:
+                history.append(json.load(snap_file))
+        except Exception:
+            continue
+    return history
+
+def check_for_patterns():
+    history = get_history(limit=50) 
+    
+    if len(history) < 10:
+        print(f"⏳ Collecting data... (Current: {len(history)}/10)")
         return
 
-    with open(snaps[0], 'r') as f:
-        latest = json.load(f)
-    with open(snaps[1], 'r') as f:
-        previous = json.load(f)
-
+    latest_snap = history[0]
+    
     for sym in config.SYMBOLS:
-        price_now = latest['data'][sym]['price']
-        price_before = previous['data'][sym]['price']
+        current_price = latest_snap['data'][sym]['price']
+        all_past_prices = [h['data'][sym]['price'] for h in history[1:]]
         
-        # Calculate the difference
-        diff = round(price_now - price_before, 2)
-        
-        if abs(diff) > 0.01: # If the price moved even a little bit
-            direction = "🚀 UP" if diff > 0 else "🔻 DOWN"
-            print(f"[{latest['timestamp']}] ALERT: {sym} moved {direction} by {abs(diff)}")
+        max_price = max(all_past_prices)
+        min_price = min(all_past_prices)
+
+        if current_price > max_price:
+            msg = f"🔥 *PATTERN HIT*: {sym} reached a NEW HIGH of {current_price}!"
+            print(msg)
+            send_telegram_msg(msg)
+            
+        elif current_price < min_price:
+            msg = f"🧊 *PATTERN HIT*: {sym} reached a NEW LOW of {current_price}!"
+            print(msg)
+            send_telegram_msg(msg)

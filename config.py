@@ -9,3 +9,7 @@ FETCH_INTERVAL = 10 # How many seconds between each data pull
 
 # The symbols we want to track
 SYMBOLS = ["NIFTY", "BANKNIFTY"]
+
+# Telegram Settings
+TELEGRAM_TOKEN = "8624369420:AAElb0tAtLlDnJOzb-1K97v5xC9Jqw9pc9A"
+TELEGRAM_CHAT_ID = "5875650151" # We will find this in the next step

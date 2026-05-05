@@ -11,7 +11,7 @@ if __name__ == "__main__":
         mock_generator.start_simulation_once() 
         
         # 2. Analyze the new data immediately
-        hawk_engine.analyze_patterns()
+        hawk_engine.check_for_patterns()
         
         # 3. Wait for the next interval
         time.sleep(10)
