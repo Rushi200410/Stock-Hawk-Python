@@ -37,3 +37,15 @@ def cleanup_old_snapshots(days=7):
             print(f"🧹 Cleaned up old snapshot: {f}")
 
 snapshot_manager = SnapshotManager()
+
+def cleanup_old_files():
+    """Deletes files older than 24 hours."""
+    now = time.time()
+    for f in os.listdir(config.SNAPSHOT_FOLDER):
+        path = os.path.join(config.SNAPSHOT_FOLDER, f)
+        # 86400 seconds = 24 hours
+        if os.stat(path).st_mtime < now - 86400:
+            os.remove(path)
+            print(f"🧹 Janitor: Removed old file {f}")
+
+            
