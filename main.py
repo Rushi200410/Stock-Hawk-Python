@@ -1,6 +1,7 @@
 import time
 import mock_generator
 import hawk_engine
+import config
 
 if __name__ == "__main__":
     print("🦅 StockHawk Engine starting...")

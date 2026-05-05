@@ -39,7 +39,7 @@ def home():
         return "<h1>Loading data...</h1>"
     
     latest_data = history[0]['data']
-    return render_template_string(HTML_TEMPLATE, data=latest_data)
+    return render_template_string(HTML_TEMPLATE, data=latest_data, config=config)
 
 if __name__ == "__main__":
     app.run(port=5000)

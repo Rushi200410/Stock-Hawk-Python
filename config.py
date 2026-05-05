@@ -5,7 +5,7 @@ ACCESS_TOKEN_FILE = "access_token.txt"
 
 # System Settings
 SNAPSHOT_FOLDER = "snapshots" # Folder where data is saved
-FETCH_INTERVAL = 10 # How many seconds between each data pull
+FETCH_INTERVAL = 3 # How many seconds between each data pull
 
 # The symbols we want to track
 SYMBOLS = ["NIFTY", "BANKNIFTY"]
