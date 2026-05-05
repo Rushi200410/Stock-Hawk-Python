@@ -20,7 +20,7 @@ def send_telegram_msg(message, symbol="NIFTY", pattern="UNKNOWN"):
 
     # 2. Log to CSV (The "History" part)
     try:
-        with open('alerts.csv', mode='a', newline='') as f:
+        with open('alert.csv', mode='a', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
             # Log columns: Time, Symbol, Pattern Name, Message
             writer.writerow([

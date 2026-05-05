@@ -38,25 +38,32 @@ def check_trend(history):
     return "Sideways ↔️"
 
 def check_for_patterns():
-    # Look back at 100 snapshots to find the long-term High
-    history = get_history(limit=100) 
+    # Load last 50 snapshots for analysis
+    history = get_history(limit=50) 
     
     if len(history) < 20:
         print(f"⏳ Building Trend Data... ({len(history)}/20)")
         return
 
     latest_snap = history[0]
-    # 'history[1:]' means "everything except the current price"
-    past_history = history[1:] 
     
     for sym in config.SYMBOLS:
         current_price = latest_snap['data'][sym]['price']
         
-        # Find the highest price in the whole history
-        long_term_high = max([h['data'][sym]['price'] for h in past_history])
+        # Calculate Moving Average (Average of last 20 prices)
+        recent_prices = [h['data'][sym]['price'] for h in history[:20]]
+        sma_20 = sum(recent_prices) / len(recent_prices)
+
+        # PATTERN: SMA Crossover (Price breaks above the average)
+        # We check if it was BELOW the SMA before, but is ABOVE it now
+        prev_price = history[1]['data'][sym]['price']
         
-        if current_price > long_term_high:
-            # This is a 'Breakout' pattern!
-            msg = f"🚀 *BREAKOUT ALERT*: {sym} just broke its 100-period HIGH at {current_price}!"
+        if prev_price <= sma_20 and current_price > sma_20:
+            msg = f"🚀 *BULLISH CROSSOVER*: {sym} crossed above SMA-20 at {current_price}!"
             print(msg)
-            send_telegram_msg(msg)
+            send_telegram_msg(msg, symbol=sym, pattern="SMA_CROSS_UP")
+            
+        elif prev_price >= sma_20 and current_price < sma_20:
+            msg = f"🔻 *BEARISH CROSSOVER*: {sym} dropped below SMA-20 at {current_price}!"
+            print(msg)
+            send_telegram_msg(msg, symbol=sym, pattern="SMA_CROSS_DOWN")
