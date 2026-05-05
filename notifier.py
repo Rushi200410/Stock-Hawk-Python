@@ -1,16 +1,33 @@
 import requests
 import config
+import csv
+from datetime import datetime
 
-def send_telegram_msg(message):
-    """Sends a notification directly to your Telegram."""
+def send_telegram_msg(message, symbol="NIFTY", pattern="UNKNOWN"):
+    """Sends a Telegram message and logs the hit to alerts.csv."""[cite: 6]
     url = f"https://api.telegram.org/bot{config.TELEGRAM_TOKEN}/sendMessage"
     payload = {
         "chat_id": config.TELEGRAM_CHAT_ID,
         "text": message,
         "parse_mode": "Markdown"
     }
+    
+    # 1. Send to Telegram
     try:
-        response = requests.post(url, data=payload)
-        return response.json()
+        requests.post(url, data=payload)
     except Exception as e:
         print(f"❌ Telegram Error: {e}")
+
+    # 2. Log to CSV (The "History" part)
+    try:
+        with open('alerts.csv', mode='a', newline='') as f:
+            writer = csv.writer(f)
+            # Log columns: Time, Symbol, Pattern Name, Message
+            writer.writerow([
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"), 
+                symbol, 
+                pattern, 
+                message.replace('\n', ' ')
+            ])
+    except Exception as e:
+        print(f"❌ CSV Logging Error: {e}")
