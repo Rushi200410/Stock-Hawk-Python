@@ -16,6 +16,7 @@ def start_simulation_once():
     
     snapshot_manager.save(market_snapshot)
     print(f"📊 Recorded Data at {datetime.now().strftime('%H:%M:%S')}")
+    # print(market_snapshot)
 
 if __name__ == "__main__":
     print("🚀 Market Simulator Started... (Ctrl+C to stop)")
