@@ -2,7 +2,7 @@
 
 This project is a small market-data simulator and pattern checker.
 
-It generates a new snapshot every 10 seconds, stores the raw JSON output in `snapshots/`, and then analyzes the most recent history for simple breakout signals.
+It generates a new snapshot every 5 seconds, stores the raw JSON output in `snapshots/`, and then analyzes the most recent history for simple breakout signals.
 
 ## What It Does
 

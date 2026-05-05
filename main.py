@@ -14,4 +14,4 @@ if __name__ == "__main__":
         hawk_engine.check_for_patterns()
         
         # 3. Wait for the next interval
-        time.sleep(10)
+        time.sleep(config.FETCH_INTERVAL)
