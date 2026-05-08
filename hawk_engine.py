@@ -3,6 +3,28 @@ import json
 import config
 from notifier import send_telegram_msg
 
+def calculate_market_metrics(chain_data):
+    """Calculates PCR and basic sentiment for the current chain."""
+    total_ce_oi = sum(opt["CE"]["OI"] for opt in chain_data)
+    total_pe_oi = sum(opt["PE"]["OI"] for opt in chain_data)
+    
+    # Avoid division by zero
+    pcr = round(total_pe_oi / total_ce_oi, 2) if total_ce_oi > 0 else 0
+    
+    # Basic Sentiment Logic
+    if pcr > 1.2: sentiment = "Extremely Bullish 🚀"
+    elif pcr > 1.0: sentiment = "Bullish ✅"
+    elif pcr < 0.8: sentiment = "Bearish 🔻"
+    elif pcr < 0.6: sentiment = "Extremely Bearish 💀"
+    else: sentiment = "Neutral ↔️"
+    
+    return {
+        "pcr": pcr,
+        "sentiment": sentiment,
+        "total_ce_oi": total_ce_oi,
+        "total_pe_oi": total_pe_oi
+    }
+
 def get_history(limit=100):
     """Loads the last N snapshots to analyze trends."""
     # Ensure the folder exists before listing

@@ -1,6 +1,7 @@
 import sys
 import os
 import csv
+from datetime import datetime
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QHBoxLayout, QLabel, QSpinBox, QComboBox, QPushButton,
                              QTableWidget, QTableWidgetItem, QHeaderView)
@@ -25,17 +26,31 @@ class StockHawkDesktop(QMainWindow):
         self.timer.timeout.connect(self.update_data)
         self.timer.start(config.FETCH_INTERVAL * 1000)
         
-        # Add a second timer to run the simulation loop
-        self.sim_timer = QTimer(self)
-        self.sim_timer.timeout.connect(self.run_simulation_step)
-        self.sim_timer.start(config.FETCH_INTERVAL * 1000)
+        # Heartbeat Timer (Simulation & Analysis)
+        self.heartbeat = QTimer(self)
+        self.heartbeat.timeout.connect(self.run_engine_step)
+        self.heartbeat.start(config.FETCH_INTERVAL * 1000)
+        
+        # Clock Timer (ticks every 1 second)
+        self.clock_timer = QTimer(self)
+        self.clock_timer.timeout.connect(self.update_clock)
+        self.clock_timer.start(1000)
         
         # Initial data load
-        self.run_simulation_step()
+        self.run_engine_step()
         self.update_data()
+        self.update_clock()
 
-    def run_simulation_step(self):
-        """This replaces the loop in dashboard.py/main.py"""
+    def update_clock(self):
+        """Updates the real-time clock display."""
+        current_time = datetime.now().strftime("%H:%M:%S")
+        self.clock_label.setText(current_time)
+
+    def run_engine_step(self):
+        """Runs the background simulation and pattern checking."""
+        import mock_generator
+        from snapshot import cleanup_old_files
+        
         mock_generator.start_simulation_once()
         hawk_engine.check_for_patterns()
         cleanup_old_files()
@@ -111,7 +126,26 @@ class StockHawkDesktop(QMainWindow):
         control_layout.addWidget(btn_chain)
         control_layout.addStretch()
         
+        # Real-time Clock Label
+        self.clock_label = QLabel("00:00:00")
+        self.clock_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #ffffff; background: #333333; padding: 4px 10px; border-radius: 4px;")
+        control_layout.addWidget(self.clock_label)
+        
         main_layout.addLayout(control_layout)
+
+        # --- STATS BAR ---
+        stats_layout = QHBoxLayout()
+        self.pcr_label = QLabel("PCR: 0.00")
+        self.sentiment_label = QLabel("Sentiment: Neutral")
+        self.pcr_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #00ff95;")
+        self.sentiment_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #ffffff;")
+        
+        stats_layout.addWidget(self.pcr_label)
+        stats_layout.addSpacing(40)
+        stats_layout.addWidget(self.sentiment_label)
+        stats_layout.addStretch()
+        
+        main_layout.addLayout(stats_layout)
 
         # --- MAIN TABLE (Options Chain) ---
         self.chain_label = QLabel("Options Chain (Live)")
@@ -160,6 +194,13 @@ class StockHawkDesktop(QMainWindow):
         if sym not in live_data: return
         current_chain = live_data[sym].get("optionsChain", [])
         self.chain_label.setText(f"{sym} Options Chain (Live) - ₹{live_data[sym]['price']}")
+        
+        # Calculate Metrics
+        metrics = hawk_engine.calculate_market_metrics(current_chain)
+        
+        # Update Labels
+        self.pcr_label.setText(f"PCR: {metrics['pcr']}")
+        self.sentiment_label.setText(f"Sentiment: {metrics['sentiment']}")
         
         # Calculate True Change in OI
         if len(history) > 1:
