@@ -1,7 +1,7 @@
 import os
 import json
 import config
-from notifier import send_telegram_msg
+from notifier import send_master_alert
 
 def calculate_market_metrics(chain_data):
     """Calculates PCR and basic sentiment for the current chain."""
@@ -83,9 +83,9 @@ def check_for_patterns():
         if prev_price <= sma_20 and current_price > sma_20:
             msg = f"🚀 *BULLISH CROSSOVER*: {sym} crossed above SMA-20 at {current_price}!"
             print(msg)
-            send_telegram_msg(msg, symbol=sym, pattern="SMA_CROSS_UP")
+            send_master_alert(msg, symbol=sym, pattern="SMA_CROSS_UP")
             
         elif prev_price >= sma_20 and current_price < sma_20:
             msg = f"🔻 *BEARISH CROSSOVER*: {sym} dropped below SMA-20 at {current_price}!"
             print(msg)
-            send_telegram_msg(msg, symbol=sym, pattern="SMA_CROSS_DOWN")
+            send_master_alert(msg, symbol=sym, pattern="SMA_CROSS_DOWN")

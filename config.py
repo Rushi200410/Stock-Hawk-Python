@@ -13,3 +13,6 @@ SYMBOLS = ["NIFTY", "BANKNIFTY"]
 # Telegram Settings
 TELEGRAM_TOKEN = "8624369420:AAElb0tAtLlDnJOzb-1K97v5xC9Jqw9pc9A"
 TELEGRAM_CHAT_ID = "5875650151" # We will find this in the next step
+
+# Add this to your existing config.py
+WHATSAPP_PHONE = "919321542278"  # Your number with country code, no '+'
