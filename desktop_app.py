@@ -1,0 +1,189 @@
+import sys
+import os
+import csv
+from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
+                             QHBoxLayout, QLabel, QSpinBox, QComboBox, QPushButton,
+                             QTableWidget, QTableWidgetItem, QHeaderView)
+from PyQt6.QtCore import QTimer, Qt
+from PyQt6.QtGui import QColor, QBrush, QFont
+
+import hawk_engine
+import config
+
+class StockHawkDesktop(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("🦅 StockHawk Desktop Terminal")
+        self.resize(1000, 750)
+        
+        self.init_ui()
+        
+        # Start the background timer to fetch snapshots without freezing UI
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.update_data)
+        self.timer.start(config.FETCH_INTERVAL * 1000)
+        
+        # Initial data load
+        self.update_data()
+
+    def init_ui(self):
+        # Main Container
+        central_widget = QWidget()
+        self.setCentralWidget(central_widget)
+        main_layout = QVBoxLayout(central_widget)
+        main_layout.setSpacing(20)
+        main_layout.setContentsMargins(20, 20, 20, 20)
+
+        # Apply Global Stylesheet
+        self.setStyleSheet("""
+            QMainWindow, QWidget { background-color: #0f0f0f; color: #e0e0e0; font-family: 'Segoe UI', sans-serif; }
+            QLabel { font-size: 14px; }
+            QTableWidget { 
+                background-color: #1a1a1a; gridline-color: #333333; 
+                border: 1px solid #333333; border-radius: 8px; font-size: 13px;
+            }
+            QHeaderView::section { 
+                background-color: #252525; color: #888888; font-weight: bold; 
+                border: 1px solid #333333; padding: 6px;
+            }
+            QComboBox, QSpinBox { 
+                background-color: #333333; color: white; border: 1px solid #555555; 
+                padding: 4px; border-radius: 4px;
+            }
+            QPushButton { 
+                background-color: #00ff95; color: black; font-weight: bold; 
+                border: none; padding: 6px 15px; border-radius: 4px;
+            }
+            QPushButton:hover { background-color: #00cc7a; }
+        """)
+
+        # --- CONTROL BAR ---
+        control_layout = QHBoxLayout()
+        control_layout.setSpacing(15)
+        
+        # Status Light
+        status_light = QLabel()
+        status_light.setFixedSize(14, 14)
+        status_light.setStyleSheet("background-color: #00ff95; border-radius: 7px;")
+        control_layout.addWidget(status_light)
+        
+        status_label = QLabel("CONNECTED")
+        status_label.setStyleSheet("color: #00ff95; font-weight: bold;")
+        control_layout.addWidget(status_label)
+        
+        control_layout.addSpacing(20)
+        
+        # Snapshot Control
+        control_layout.addWidget(QLabel("Snapshots:"))
+        self.snap_spin = QSpinBox()
+        self.snap_spin.setRange(1, 100)
+        self.snap_spin.setValue(10)
+        self.snap_spin.valueChanged.connect(self.update_data) # Instantly update when changed
+        control_layout.addWidget(self.snap_spin)
+        
+        # Symbol Selection
+        self.symbol_combo = QComboBox()
+        self.symbol_combo.addItems(config.SYMBOLS)
+        self.symbol_combo.currentTextChanged.connect(self.update_data) # Instantly update
+        control_layout.addWidget(self.symbol_combo)
+        
+        # Expiry Selection
+        self.expiry_combo = QComboBox()
+        self.expiry_combo.addItem("24-MAY")
+        control_layout.addWidget(self.expiry_combo)
+        
+        # Option Chain Button
+        btn_chain = QPushButton("OPTION CHAIN")
+        control_layout.addWidget(btn_chain)
+        control_layout.addStretch()
+        
+        main_layout.addLayout(control_layout)
+
+        # --- MAIN TABLE (Options Chain) ---
+        self.chain_label = QLabel("Options Chain (Live)")
+        self.chain_label.setStyleSheet("font-size: 18px; font-weight: bold; color: #00ff95;")
+        main_layout.addWidget(self.chain_label)
+
+        self.chain_table = QTableWidget(0, 7)
+        self.chain_table.setHorizontalHeaderLabels([
+            "CE OI", "CE Change", "CE LTP", "Strike", "PE LTP", "PE Change", "PE OI"
+        ])
+        self.chain_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.chain_table.verticalHeader().setVisible(False)
+        self.chain_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.chain_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        main_layout.addWidget(self.chain_table, stretch=2)
+
+        # --- ALERTS TABLE ---
+        alerts_label = QLabel("Recent Pattern Hits")
+        alerts_label.setStyleSheet("font-size: 16px; font-weight: bold;")
+        main_layout.addWidget(alerts_label)
+        
+        self.alerts_table = QTableWidget(0, 4)
+        self.alerts_table.setHorizontalHeaderLabels(["Time", "Symbol", "Pattern", "Message"])
+        self.alerts_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
+        self.alerts_table.verticalHeader().setVisible(False)
+        self.alerts_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.alerts_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        main_layout.addWidget(self.alerts_table, stretch=1)
+
+    def _get_or_create_item(self, table, row, col):
+        """Helper to safely get or create table cells to avoid UI flickering."""
+        item = table.item(row, col)
+        if not item:
+            item = QTableWidgetItem()
+            table.setItem(row, col, item)
+        return item
+
+    def update_data(self):
+        snap_count = self.snap_spin.value()
+        history = hawk_engine.get_history(limit=snap_count + 1)
+        if not history: return
+        
+        live_data = history[0]['data']
+        sym = self.symbol_combo.currentText()
+        
+        if sym not in live_data: return
+        current_chain = live_data[sym].get("optionsChain", [])
+        self.chain_label.setText(f"{sym} Options Chain (Live) - ₹{live_data[sym]['price']}")
+        
+        # Calculate True Change in OI
+        if len(history) > 1:
+            old_data = history[-1]['data']
+            if sym in old_data:
+                old_oi_map = {opt["strikePrice"]: {"CE_OI": opt["CE"]["OI"], "PE_OI": opt["PE"]["OI"]} for opt in old_data[sym].get("optionsChain", [])}
+                for opt in current_chain:
+                    strike = opt["strikePrice"]
+                    opt["CE"]["changeInOI"] = opt["CE"]["OI"] - old_oi_map.get(strike, {"CE_OI": opt["CE"]["OI"]})["CE_OI"]
+                    opt["PE"]["changeInOI"] = opt["PE"]["OI"] - old_oi_map.get(strike, {"PE_OI": opt["PE"]["OI"]})["PE_OI"]
+
+        # --- Populate Option Chain Table (No Flicker) ---
+        self.chain_table.setRowCount(len(current_chain))
+        for r, opt in enumerate(current_chain):
+            bg_color = QColor(0, 255, 149, 38) if opt.get("isATM") else QColor("#1a1a1a")
+            ce_change_color = QColor("#00ff95") if opt["CE"]["changeInOI"] > 0 else (QColor("#ff4d4d") if opt["CE"]["changeInOI"] < 0 else QColor("#e0e0e0"))
+            pe_change_color = QColor("#00ff95") if opt["PE"]["changeInOI"] > 0 else (QColor("#ff4d4d") if opt["PE"]["changeInOI"] < 0 else QColor("#e0e0e0"))
+
+            cells_data = [
+                (str(opt["CE"]["OI"]), QColor("#e0e0e0"), False, Qt.AlignmentFlag.AlignLeft),
+                (str(opt["CE"]["changeInOI"]), ce_change_color, False, Qt.AlignmentFlag.AlignLeft),
+                (f"₹{opt['CE']['LTP']}", QColor("#e0e0e0"), False, Qt.AlignmentFlag.AlignLeft),
+                (str(opt["strikePrice"]), QColor("#ffffff"), True, Qt.AlignmentFlag.AlignCenter),
+                (f"₹{opt['PE']['LTP']}", QColor("#e0e0e0"), False, Qt.AlignmentFlag.AlignLeft),
+                (str(opt["PE"]["changeInOI"]), pe_change_color, False, Qt.AlignmentFlag.AlignLeft),
+                (str(opt["PE"]["OI"]), QColor("#e0e0e0"), False, Qt.AlignmentFlag.AlignLeft),
+            ]
+
+            for c, (text, fg_color, bold, align) in enumerate(cells_data):
+                item = self._get_or_create_item(self.chain_table, r, c)
+                item.setText(text)
+                item.setForeground(QBrush(fg_color))
+                item.setBackground(QBrush(bg_color))
+                item.setTextAlignment(align | Qt.AlignmentFlag.AlignVCenter)
+                font = QFont(); font.setBold(bold); item.setFont(font)
+
+if __name__ == "__main__":
+    app = QApplication(sys.argv)
+    window = StockHawkDesktop()
+    window.show()
+    sys.exit(app.exec())
