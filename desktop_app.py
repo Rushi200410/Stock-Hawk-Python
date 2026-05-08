@@ -9,6 +9,8 @@ from PyQt6.QtGui import QColor, QBrush, QFont
 
 import hawk_engine
 import config
+import mock_generator
+from snapshot import cleanup_old_files
 
 class StockHawkDesktop(QMainWindow):
     def __init__(self):
@@ -23,8 +25,20 @@ class StockHawkDesktop(QMainWindow):
         self.timer.timeout.connect(self.update_data)
         self.timer.start(config.FETCH_INTERVAL * 1000)
         
+        # Add a second timer to run the simulation loop
+        self.sim_timer = QTimer(self)
+        self.sim_timer.timeout.connect(self.run_simulation_step)
+        self.sim_timer.start(config.FETCH_INTERVAL * 1000)
+        
         # Initial data load
+        self.run_simulation_step()
         self.update_data()
+
+    def run_simulation_step(self):
+        """This replaces the loop in dashboard.py/main.py"""
+        mock_generator.start_simulation_once()
+        hawk_engine.check_for_patterns()
+        cleanup_old_files()
 
     def init_ui(self):
         # Main Container
@@ -181,6 +195,30 @@ class StockHawkDesktop(QMainWindow):
                 item.setBackground(QBrush(bg_color))
                 item.setTextAlignment(align | Qt.AlignmentFlag.AlignVCenter)
                 font = QFont(); font.setBold(bold); item.setFont(font)
+                
+        # --- 2. NEW: Update Alerts Table ---
+        self.refresh_alerts_table()
+
+    def refresh_alerts_table(self):
+        """Reads alert.csv and updates the bottom table."""
+        alerts = []
+        # Note: Your notifier.py saves to 'alert.csv', ensure name matches
+        if os.path.exists('alert.csv'):
+            with open('alert.csv', mode='r', encoding='utf-8') as f:
+                reader = list(csv.reader(f))
+                # Get last 5 alerts, newest first
+                alerts = reader[-5:][::-1]
+
+        self.alerts_table.setRowCount(len(alerts))
+        for r, row_data in enumerate(alerts):
+            for c, text in enumerate(row_data):
+                item = self._get_or_create_item(self.alerts_table, r, c)
+                item.setText(text)
+                
+                # Color code the pattern column
+                if c == 2:
+                    color = QColor("#00ff95") if "UP" in text else QColor("#ff4d4d")
+                    item.setForeground(QBrush(color))
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
