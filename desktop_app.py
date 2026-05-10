@@ -1,6 +1,7 @@
 import sys
 import os
 import csv
+import json
 from datetime import datetime
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QHBoxLayout, QLabel, QSpinBox, QComboBox, QPushButton,
@@ -326,9 +327,46 @@ class StockHawkDesktop(QMainWindow):
 
     def refresh_monitor_table(self):
         """Populates the monitoring view with data from the milestones folder."""
-        # This function will read the files in the milestones/ folder
-        # and display the history of interval-based reports in a table view
-        pass
+        milestone_folder = config.MILESTONE_FOLDER
+        if not os.path.exists(milestone_folder):
+            return
+
+        # 1. Get all milestone files and sort them by time (newest first)
+        files = [f for f in os.listdir(milestone_folder) if f.endswith('.json')]
+        files.sort(reverse=True) # Assuming filename has timestamp like YYYYMMDD_HHMM
+
+        self.monitor_table.setRowCount(len(files))
+        
+        for r, filename in enumerate(files):
+            try:
+                with open(os.path.join(milestone_folder, filename), 'r') as f:
+                    content = json.load(f)
+                    m_type = content.get("type", "N/A")
+                    data = content.get("data", {})
+                    
+                    # 2. Extract specific values for the table
+                    # We'll calculate PCR on the fly using our engine
+                    metrics = hawk_engine.calculate_market_metrics(data.get("BANKNIFTY", {}).get("optionsChain", []))
+                    
+                    # 3. Create items for each column
+                    # Format: [Interval, NIFTY Price, BANKNIFTY Price, PCR, Sentiment]
+                    nifty_price = f"₹{data.get('NIFTY', {}).get('price', 0)}"
+                    bn_price = f"₹{data.get('BANKNIFTY', {}).get('price', 0)}"
+                    
+                    display_data = [
+                        m_type, nifty_price, bn_price, 
+                        str(metrics['pcr']), metrics['sentiment']
+                    ]
+                    
+                    for c, text in enumerate(display_data):
+                        item = self._get_or_create_item(self.monitor_table, r, c)
+                        item.setText(text)
+                        # Optional: Color code the sentiment
+                        if c == 4:
+                            color = QColor("#00ff95") if "Bullish" in text else QColor("#ff4d4d")
+                            item.setForeground(QBrush(color))
+            except Exception as e:
+                print(f"Error loading milestone {filename}: {e}")
 
     def refresh_alerts_table(self):
         """Reads alert.csv and updates the bottom table."""
