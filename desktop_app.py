@@ -31,6 +31,9 @@ class StockHawkDesktop(QMainWindow):
         self.heartbeat.timeout.connect(self.run_engine_step)
         self.heartbeat.start(config.FETCH_INTERVAL * 1000)
         
+        self.current_interval_minutes = 0
+        self.last_milestone_time = datetime.now()
+        
         # Clock Timer (ticks every 1 second)
         self.clock_timer = QTimer(self)
         self.clock_timer.timeout.connect(self.update_clock)
@@ -54,6 +57,37 @@ class StockHawkDesktop(QMainWindow):
         mock_generator.start_simulation_once()
         hawk_engine.check_for_patterns()
         cleanup_old_files()
+        
+        # Check if it's time for a Milestone Report
+        if self.current_interval_minutes > 0:
+            now = datetime.now()
+            diff = (now - self.last_milestone_time).total_seconds() / 60
+            
+            if diff >= self.current_interval_minutes:
+                self.generate_interval_report()
+                self.last_milestone_time = now
+
+    def update_interval_settings(self, text):
+        if text == "OFF":
+            self.current_interval_minutes = 0
+        else:
+            self.current_interval_minutes = int(text.split(" ")[0])
+            self.last_milestone_time = datetime.now()
+            print(f"⏱️ Milestone interval set to {self.current_interval_minutes} minutes")
+
+    def generate_interval_report(self):
+        """Compares current price with the previous milestone."""
+        history = hawk_engine.get_history(limit=1)
+        if not history: return
+        
+        current_data = history[0]['data']
+        from snapshot import save_milestone
+        save_milestone(current_data, f"{self.current_interval_minutes}m")
+        
+        report_msg = hawk_engine.compare_milestones(current_data, self.current_interval_minutes)
+        if report_msg:
+            from notifier import send_master_alert
+            send_master_alert(report_msg, symbol="MARKET", pattern=f"REPORT_{self.current_interval_minutes}M")
 
     def init_ui(self):
         # Main Container
@@ -109,6 +143,13 @@ class StockHawkDesktop(QMainWindow):
         self.snap_spin.setValue(10)
         self.snap_spin.valueChanged.connect(self.update_data) # Instantly update when changed
         control_layout.addWidget(self.snap_spin)
+        
+        # Interval Selection
+        control_layout.addWidget(QLabel("Monitoring:"))
+        self.interval_combo = QComboBox()
+        self.interval_combo.addItems(["OFF", "1 Min", "5 Min", "15 Min"])
+        self.interval_combo.currentTextChanged.connect(self.update_interval_settings)
+        control_layout.addWidget(self.interval_combo)
         
         # Symbol Selection
         self.symbol_combo = QComboBox()

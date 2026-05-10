@@ -48,4 +48,16 @@ def cleanup_old_files():
             os.remove(path)
             print(f"🧹 Janitor: Removed old file {f}")
 
+
+def save_milestone(data, interval_name):
+    """Saves a snapshot to the permanent milestones folder."""
+    if not os.path.exists(config.MILESTONE_FOLDER):
+        os.makedirs(config.MILESTONE_FOLDER)
+    
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+    filename = f"{interval_name}_{timestamp}.json"
+    filepath = os.path.join(config.MILESTONE_FOLDER, filename)
+    
+    with open(filepath, "w") as f:
+        json.dump({"type": interval_name, "data": data}, f)
             

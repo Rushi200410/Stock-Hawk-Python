@@ -89,3 +89,37 @@ def check_for_patterns():
             msg = f"🔻 *BEARISH CROSSOVER*: {sym} dropped below SMA-20 at {current_price}!"
             print(msg)
             send_master_alert(msg, symbol=sym, pattern="SMA_CROSS_DOWN")
+
+def compare_milestones(current_data, interval_mins):
+    """Generates a text report comparing current prices with the last saved milestone."""
+    if not os.path.exists(config.MILESTONE_FOLDER):
+        return None
+        
+    # 1. Find files for this specific interval, sorted newest first
+    prefix = f"{interval_mins}m_"
+    files = [os.path.join(config.MILESTONE_FOLDER, f) for f in os.listdir(config.MILESTONE_FOLDER) if f.startswith(prefix)]
+    files.sort(key=os.path.getmtime, reverse=True)
+    
+    # We need at least 2 files (the one we just saved, and the previous one) to compare
+    if len(files) < 2:
+        return f"⏳ First milestone for {interval_mins}m recorded. Waiting for next interval to compare."
+        
+    try:
+        with open(files[1], 'r') as prev_file: # index 1 is the second newest
+            prev_milestone = json.load(prev_file)
+            prev_data = prev_milestone.get('data', {})
+    except Exception as e:
+        print(f"Error loading previous milestone: {e}")
+        return None
+        
+    # 2 & 3. Calculate % change and format
+    reports = [f"📊 *{interval_mins} Min Market Report*"]
+    for sym in current_data:
+        curr_price = current_data[sym]['price']
+        if sym in prev_data:
+            prev_price = prev_data[sym]['price']
+            diff = round(curr_price - prev_price, 2)
+            status = "INCREASED 🟢" if diff > 0 else ("DECREASED 🔴" if diff < 0 else "UNCHANGED ⚪")
+            reports.append(f"• {sym}: {status} by {abs(diff)} (Now: {curr_price})")
+    
+    return "\n".join(reports) if len(reports) > 1 else None
