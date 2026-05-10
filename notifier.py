@@ -2,10 +2,10 @@ import requests
 import config
 import csv
 from datetime import datetime
-from wabridge import WABridge  # Import the WhatsApp bridge
+# from wabridge import WABridge  # Import the WhatsApp bridge
 
 # Initialize the WhatsApp connection
-wa = WABridge()
+# wa = WABridge()
 
 def send_master_alert(message, symbol="NIFTY", pattern="UNKNOWN"):
     """The 'Master' function that coordinates all notifications."""
@@ -17,7 +17,7 @@ def send_master_alert(message, symbol="NIFTY", pattern="UNKNOWN"):
     send_telegram(message)
     
     # 3. Call WhatsApp
-    send_whatsapp(message)
+    # send_whatsapp(message)
 
 def send_telegram(message):
     """Handles Telegram logic exclusively."""
@@ -33,7 +33,8 @@ def send_whatsapp(message):
     try:
         # Removes Markdown bold '*' for cleaner WhatsApp reading if desired
         clean_msg = message.replace("*", "") 
-        wa.send(config.WHATSAPP_PHONE, clean_msg)
+        # wa.send(config.WHATSAPP_PHONE, clean_msg)
+        pass # Placeholder while WhatsApp is disabled
     except Exception as e:
         print(f"❌ WhatsApp Error: {e}")
 
