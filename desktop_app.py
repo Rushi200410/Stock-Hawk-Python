@@ -4,7 +4,7 @@ import csv
 from datetime import datetime
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QHBoxLayout, QLabel, QSpinBox, QComboBox, QPushButton,
-                             QTableWidget, QTableWidgetItem, QHeaderView)
+                             QTableWidget, QTableWidgetItem, QHeaderView, QTabWidget)
 from PyQt6.QtCore import QTimer, Qt
 from PyQt6.QtGui import QColor, QBrush, QFont
 
@@ -91,11 +91,11 @@ class StockHawkDesktop(QMainWindow):
 
     def init_ui(self):
         # Main Container
-        central_widget = QWidget()
-        self.setCentralWidget(central_widget)
-        main_layout = QVBoxLayout(central_widget)
-        main_layout.setSpacing(20)
-        main_layout.setContentsMargins(20, 20, 20, 20)
+        self.central_widget = QWidget()
+        self.setCentralWidget(self.central_widget)
+        self.main_layout = QVBoxLayout(self.central_widget)
+        self.main_layout.setSpacing(20)
+        self.main_layout.setContentsMargins(20, 20, 20, 20)
 
         # Apply Global Stylesheet
         self.setStyleSheet("""
@@ -118,7 +118,29 @@ class StockHawkDesktop(QMainWindow):
                 border: none; padding: 6px 15px; border-radius: 4px;
             }
             QPushButton:hover { background-color: #00cc7a; }
+            QTabWidget::pane { border: 1px solid #333; background: #1a1a1a; border-radius: 8px; }
+            QTabBar::tab { background: #252525; padding: 10px 20px; border-top-left-radius: 8px; border-top-right-radius: 8px; margin-right: 5px; }
+            QTabBar::tab:selected { background: #00ff95; color: black; font-weight: bold; }
         """)
+
+        # Create the Tab Widget
+        self.tabs = QTabWidget()
+        
+        # --- TAB 1: LIVE MARKET (Existing View) ---
+        self.live_market_tab = QWidget()
+        self.setup_live_market_tab()
+        self.tabs.addTab(self.live_market_tab, "Live Market")
+
+        # --- TAB 2: MONITORING PAGE (New View) ---
+        self.monitoring_tab = QWidget()
+        self.setup_monitoring_tab()
+        self.tabs.addTab(self.monitoring_tab, "Monitoring")
+
+        self.main_layout.addWidget(self.tabs)
+
+    def setup_live_market_tab(self):
+        layout = QVBoxLayout(self.live_market_tab)
+        layout.setSpacing(20)
 
         # --- CONTROL BAR ---
         control_layout = QHBoxLayout()
@@ -172,7 +194,7 @@ class StockHawkDesktop(QMainWindow):
         self.clock_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #ffffff; background: #333333; padding: 4px 10px; border-radius: 4px;")
         control_layout.addWidget(self.clock_label)
         
-        main_layout.addLayout(control_layout)
+        layout.addLayout(control_layout)
 
         # --- STATS BAR ---
         stats_layout = QHBoxLayout()
@@ -186,12 +208,12 @@ class StockHawkDesktop(QMainWindow):
         stats_layout.addWidget(self.sentiment_label)
         stats_layout.addStretch()
         
-        main_layout.addLayout(stats_layout)
+        layout.addLayout(stats_layout)
 
         # --- MAIN TABLE (Options Chain) ---
         self.chain_label = QLabel("Options Chain (Live)")
         self.chain_label.setStyleSheet("font-size: 18px; font-weight: bold; color: #00ff95;")
-        main_layout.addWidget(self.chain_label)
+        layout.addWidget(self.chain_label)
 
         self.chain_table = QTableWidget(0, 7)
         self.chain_table.setHorizontalHeaderLabels([
@@ -201,12 +223,30 @@ class StockHawkDesktop(QMainWindow):
         self.chain_table.verticalHeader().setVisible(False)
         self.chain_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.chain_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        main_layout.addWidget(self.chain_table, stretch=2)
+        layout.addWidget(self.chain_table, stretch=2)
 
-        # --- ALERTS TABLE ---
+    def setup_monitoring_tab(self):
+        layout = QVBoxLayout(self.monitoring_tab)
+        layout.setSpacing(20)
+        
+        # Monitoring Page focuses only on key changes and reports
+        self.monitoring_label = QLabel("Interval-Based Trend Reports")
+        self.monitoring_label.setStyleSheet("font-size: 18px; font-weight: bold; color: #00ff95;")
+        layout.addWidget(self.monitoring_label)
+        
+        # Add a table specifically for monitoring changes across intervals
+        self.monitor_table = QTableWidget(0, 5)
+        self.monitor_table.setHorizontalHeaderLabels(["Interval", "NIFTY Change", "BANKNIFTY Change", "PCR", "Sentiment"])
+        self.monitor_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.monitor_table.verticalHeader().setVisible(False)
+        self.monitor_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.monitor_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        layout.addWidget(self.monitor_table, stretch=2)
+
+        # Keep the Alerts Table at the bottom of this page too
         alerts_label = QLabel("Recent Pattern Hits")
         alerts_label.setStyleSheet("font-size: 16px; font-weight: bold;")
-        main_layout.addWidget(alerts_label)
+        layout.addWidget(alerts_label)
         
         self.alerts_table = QTableWidget(0, 4)
         self.alerts_table.setHorizontalHeaderLabels(["Time", "Symbol", "Pattern", "Message"])
@@ -214,7 +254,7 @@ class StockHawkDesktop(QMainWindow):
         self.alerts_table.verticalHeader().setVisible(False)
         self.alerts_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.alerts_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        main_layout.addWidget(self.alerts_table, stretch=1)
+        layout.addWidget(self.alerts_table, stretch=1)
 
     def _get_or_create_item(self, table, row, col):
         """Helper to safely get or create table cells to avoid UI flickering."""
@@ -280,6 +320,15 @@ class StockHawkDesktop(QMainWindow):
                 
         # --- 2. NEW: Update Alerts Table ---
         self.refresh_alerts_table()
+        
+        # --- 3. NEW: Update Monitor Table ---
+        self.refresh_monitor_table()
+
+    def refresh_monitor_table(self):
+        """Populates the monitoring view with data from the milestones folder."""
+        # This function will read the files in the milestones/ folder
+        # and display the history of interval-based reports in a table view
+        pass
 
     def refresh_alerts_table(self):
         """Reads alert.csv and updates the bottom table."""
