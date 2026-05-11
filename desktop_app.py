@@ -6,9 +6,11 @@ from datetime import datetime
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QHBoxLayout, QLabel, QSpinBox, QComboBox, QPushButton,
                              QTableWidget, QTableWidgetItem, QHeaderView, QTabWidget,
-                             QLineEdit)
+                             QLineEdit, QInputDialog, QMessageBox)
 from PyQt6.QtCore import QTimer, Qt
 from PyQt6.QtGui import QColor, QBrush, QFont
+from kiteconnect import KiteConnect
+from kite_auth import KiteAuthenticator
 
 import hawk_engine
 import config
@@ -447,9 +449,22 @@ class StockHawkDesktop(QMainWindow):
         layout.addStretch()
 
     def handle_kite_login(self):
-        # We'll wire this to the kite_worker flow in the next step
-        self.auth_status.setText("Status: Pending Authentication...")
-        print("Initiating Kite Connect Login...")
+        auth = KiteAuthenticator()
+        login_url = auth.get_login_url()
+        
+        # 1. Show the URL to the user
+        QMessageBox.information(self, "Kite Login", 
+            f"Please log in here:\n\n{login_url}\n\nAfter logging in, you will be redirected to a URL. Copy the 'request_token' from that URL.")
+        
+        # 2. Get the request_token from the user
+        token, ok = QInputDialog.getText(self, "Request Token", "Paste the request_token here:")
+        
+        if ok and token:
+            access_token = auth.generate_session(token)
+            if access_token:
+                self.auth_status.setText("Status: Authenticated ✅")
+                self.kite_instance = KiteConnect(api_key=config.API_KEY)
+                self.kite_instance.set_access_token(access_token)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
