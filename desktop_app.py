@@ -23,6 +23,8 @@ class StockHawkDesktop(QMainWindow):
         self.setWindowTitle("🦅 StockHawk Desktop Terminal")
         self.resize(1000, 750)
         
+        self.kite_auth = KiteAuthenticator()
+        
         self.init_ui()
         
         # Start the background timer to fetch snapshots without freezing UI
@@ -47,6 +49,11 @@ class StockHawkDesktop(QMainWindow):
         self.run_engine_step()
         self.update_data()
         self.update_clock()
+        
+        # Auto-load token on startup if valid
+        if self.kite_auth.load_token():
+            self.auth_status.setText("Status: Authenticated ✅ (Loaded)")
+            self.kite_instance = self.kite_auth.kite
 
     def update_clock(self):
         """Updates the real-time clock display."""
@@ -54,14 +61,22 @@ class StockHawkDesktop(QMainWindow):
         self.clock_label.setText(current_time)
 
     def run_engine_step(self):
-        """Runs the background simulation and pattern checking."""
-        import mock_generator
-        from snapshot import cleanup_old_files
+        """Switches the app from MOCK data to REAL Kite data."""
+        import kite_engine # Import your new real-data fetcher
+        import hawk_engine
+        from snapshot import snapshot_manager, cleanup_old_files
         
-        mock_generator.start_simulation_once()
-        hawk_engine.check_for_patterns()
-        cleanup_old_files()
+        # 1. CALL THE REAL API instead of mock_generator
+        real_market_data = kite_engine.fetch_real_market_data()
         
+        if real_market_data:
+            # 2. Save it as a snapshot so all your existing logic works!
+            snapshot_manager.save(real_market_data)
+            
+            # 3. Pattern analysis and cleanup
+            hawk_engine.check_for_patterns()
+            cleanup_old_files()
+            
         # Check if it's time for a Milestone Report
         if self.current_interval_minutes > 0:
             now = datetime.now()
@@ -449,8 +464,7 @@ class StockHawkDesktop(QMainWindow):
         layout.addStretch()
 
     def handle_kite_login(self):
-        auth = KiteAuthenticator()
-        login_url = auth.get_login_url()
+        login_url = self.kite_auth.get_login_url()
         
         # 1. Show the URL to the user
         QMessageBox.information(self, "Kite Login", 
@@ -460,11 +474,10 @@ class StockHawkDesktop(QMainWindow):
         token, ok = QInputDialog.getText(self, "Request Token", "Paste the request_token here:")
         
         if ok and token:
-            access_token = auth.generate_session(token)
+            access_token = self.kite_auth.generate_session(token)
             if access_token:
                 self.auth_status.setText("Status: Authenticated ✅")
-                self.kite_instance = KiteConnect(api_key=config.API_KEY)
-                self.kite_instance.set_access_token(access_token)
+                self.kite_instance = self.kite_auth.kite
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
