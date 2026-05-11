@@ -24,7 +24,7 @@ def send_telegram(message):
     url = f"https://api.telegram.org/bot{config.TELEGRAM_TOKEN}/sendMessage"
     payload = {"chat_id": config.TELEGRAM_CHAT_ID, "text": message, "parse_mode": "Markdown"}
     try:
-        requests.post(url, data=payload)
+        requests.post(url, data=payload, timeout=5)
     except Exception as e:
         print(f"Telegram Error: {e}")
 

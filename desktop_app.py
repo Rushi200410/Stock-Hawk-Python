@@ -2,6 +2,8 @@ import sys
 import os
 import csv
 import json
+import time
+from collections import deque
 from datetime import datetime
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QHBoxLayout, QLabel, QSpinBox, QComboBox, QPushButton,
@@ -24,19 +26,18 @@ class StockHawkDesktop(QMainWindow):
         self.resize(1000, 750)
         
         self.kite_auth = KiteAuthenticator()
-        
+        self.kite_instance = None
+        self.latest_market_data = None
+        self.previous_market_data = None
+        self.last_aux_refresh_ts = 0.0
+
         self.init_ui()
         
-        # Start the background timer to fetch snapshots without freezing UI
+        # Start one background timer that both fetches and renders fresh data.
         self.timer = QTimer(self)
-        self.timer.timeout.connect(self.update_data)
+        self.timer.timeout.connect(self.run_engine_step)
         self.timer.start(config.FETCH_INTERVAL * 1000)
-        
-        # Heartbeat Timer (Simulation & Analysis)
-        self.heartbeat = QTimer(self)
-        self.heartbeat.timeout.connect(self.run_engine_step)
-        self.heartbeat.start(config.FETCH_INTERVAL * 1000)
-        
+
         self.current_interval_minutes = 0
         self.last_milestone_time = datetime.now()
         
@@ -47,7 +48,6 @@ class StockHawkDesktop(QMainWindow):
         
         # Initial data load
         self.run_engine_step()
-        self.update_data()
         self.update_clock()
         
         # Auto-load token on startup if valid
@@ -61,39 +61,134 @@ class StockHawkDesktop(QMainWindow):
         self.clock_label.setText(current_time)
 
     def run_engine_step(self):
-        """Switches the app from MOCK data to REAL Kite data."""
-        import kite_engine # Import your new real-data fetcher
+        """Fetches fresh data once and renders it from memory."""
+        import kite_engine
         import hawk_engine
         from snapshot import snapshot_manager, cleanup_old_files
-        
-        # 1. Try real API data first. If Kite is not authenticated, fall back to the simulator
-        # so the app still works locally.
-        real_market_data = kite_engine.fetch_real_market_data()
-        
+
+        self.previous_market_data = self.latest_market_data
+
+        real_market_data = kite_engine.fetch_real_market_data(
+            getattr(self, "kite_instance", None),
+            depth=max(4, self.strike_spin.value() + 2),
+        )
+
         if real_market_data:
-            # 2. Save it as a snapshot so all your existing logic works!
             snapshot_manager.save(real_market_data)
+            self.latest_market_data = real_market_data
         else:
-            mock_generator.start_simulation_once()
-            
-        # 3. Pattern analysis and cleanup
+            self.latest_market_data = mock_generator.start_simulation_once()
+
         hawk_engine.check_for_patterns()
         cleanup_old_files()
-            
-        # Check if it's time for a Milestone Report
+
         if self.current_interval_minutes > 0:
             now = datetime.now()
             diff = (now - self.last_milestone_time).total_seconds() / 60
-            
             if diff >= self.current_interval_minutes:
                 self.generate_interval_report()
                 self.last_milestone_time = now
 
+        self.render_latest_data()
+
     def manual_refresh(self):
         """Force an immediate data update without waiting for the 3-second timer."""
         print("🔄 Manual refresh triggered...")
-        self.run_engine_step() # Trigger background fetch
-        self.update_data()      # Update UI immediately
+        self.update_data()
+
+    def on_tab_changed(self, index):
+        """Refreshes the slower tables when the monitoring tab becomes visible."""
+        if index == 1:
+            self.refresh_alerts_table()
+            self.refresh_monitor_table()
+
+    def render_latest_data(self):
+        """Updates the live view from the cached market snapshot."""
+        if not self.latest_market_data:
+            return
+
+        selected_symbol = self.symbol_combo.currentText()
+        live_data = self.latest_market_data
+        sym = selected_symbol
+
+        if sym not in live_data:
+            return
+
+        current_chain = live_data[sym].get("optionsChain", [])
+        self.chain_label.setText(f"{sym} Options Chain (Live) - â‚¹{live_data[sym]['price']}")
+
+        metrics = hawk_engine.calculate_market_metrics(current_chain)
+        self.chain_label.setText(
+            f"{sym} Options Chain (Live) - {self._format_currency(live_data[sym]['price'])}"
+        )
+        self.pcr_label.setText(f"PCR: {metrics['pcr']}")
+        self.sentiment_label.setText(f"Sentiment: {metrics['sentiment']}")
+
+        if self.previous_market_data and sym in self.previous_market_data:
+            old_oi_map = {
+                opt["strikePrice"]: {"CE_OI": opt["CE"]["OI"], "PE_OI": opt["PE"]["OI"]}
+                for opt in self.previous_market_data[sym].get("optionsChain", [])
+            }
+            for opt in current_chain:
+                strike = opt["strikePrice"]
+                opt["CE"]["changeInOI"] = opt["CE"]["OI"] - old_oi_map.get(strike, {"CE_OI": opt["CE"]["OI"]})["CE_OI"]
+                opt["PE"]["changeInOI"] = opt["PE"]["OI"] - old_oi_map.get(strike, {"PE_OI": opt["PE"]["OI"]})["PE_OI"]
+
+        num_strikes = self.strike_spin.value()
+        atm_index = -1
+        for i, opt in enumerate(current_chain):
+            if opt.get("isATM"):
+                atm_index = i
+                break
+
+        if atm_index != -1:
+            start = max(0, atm_index - num_strikes)
+            end = min(len(current_chain), atm_index + num_strikes)
+            display_chain = current_chain[start:end]
+        else:
+            display_chain = current_chain
+
+        self.chain_table.setRowCount(len(display_chain))
+        for r, opt in enumerate(display_chain):
+            bg_color = QColor(0, 255, 149, 38) if opt.get("isATM") else QColor("#1a1a1a")
+            ce_change_color = QColor("#00ff95") if opt["CE"]["changeInOI"] > 0 else (QColor("#ff4d4d") if opt["CE"]["changeInOI"] < 0 else QColor("#e0e0e0"))
+            pe_change_color = QColor("#00ff95") if opt["PE"]["changeInOI"] > 0 else (QColor("#ff4d4d") if opt["PE"]["changeInOI"] < 0 else QColor("#e0e0e0"))
+
+            cells_data = [
+                (str(opt["CE"]["OI"]), QColor("#e0e0e0"), False, Qt.AlignmentFlag.AlignLeft),
+                (str(opt["CE"]["changeInOI"]), ce_change_color, False, Qt.AlignmentFlag.AlignLeft),
+                (f"â‚¹{opt['CE']['LTP']}", QColor("#e0e0e0"), False, Qt.AlignmentFlag.AlignLeft),
+                (str(opt["strikePrice"]), QColor("#ffffff"), True, Qt.AlignmentFlag.AlignCenter),
+                (f"â‚¹{opt['PE']['LTP']}", QColor("#e0e0e0"), False, Qt.AlignmentFlag.AlignLeft),
+                (str(opt["PE"]["changeInOI"]), pe_change_color, False, Qt.AlignmentFlag.AlignLeft),
+                (str(opt["PE"]["OI"]), QColor("#e0e0e0"), False, Qt.AlignmentFlag.AlignLeft),
+            ]
+
+            for c, (text, fg_color, bold, align) in enumerate(cells_data):
+                item = self._get_or_create_item(self.chain_table, r, c)
+                item.setText(text)
+                item.setForeground(QBrush(fg_color))
+                item.setBackground(QBrush(bg_color))
+                item.setTextAlignment(align | Qt.AlignmentFlag.AlignVCenter)
+                font = QFont()
+                font.setBold(bold)
+                item.setFont(font)
+
+        self._sanitize_currency_table(self.chain_table)
+        self._refresh_auxiliary_tables_if_needed()
+
+    def _refresh_auxiliary_tables_if_needed(self):
+        """Avoids expensive file scans unless the monitoring tab is visible."""
+        if self.tabs.currentIndex() != 1:
+            return
+
+        now_ts = time.monotonic()
+        if now_ts - self.last_aux_refresh_ts < 10:
+            return
+
+        self.refresh_alerts_table()
+        self.refresh_monitor_table()
+        self.last_aux_refresh_ts = now_ts
 
     def update_interval_settings(self, text):
         if text == "OFF":
@@ -105,10 +200,13 @@ class StockHawkDesktop(QMainWindow):
 
     def generate_interval_report(self):
         """Compares current price with the previous milestone."""
-        history = hawk_engine.get_history(limit=1)
-        if not history: return
-        
-        current_data = history[0]['data']
+        current_data = self.latest_market_data
+        if not current_data:
+            history = hawk_engine.get_history(limit=1)
+            if not history:
+                return
+            current_data = history[0]['data']
+
         from snapshot import save_milestone
         save_milestone(current_data, f"{self.current_interval_minutes}m")
         
@@ -168,6 +266,8 @@ class StockHawkDesktop(QMainWindow):
         self.settings_tab = QWidget()
         self.setup_settings_tab()
         self.tabs.addTab(self.settings_tab, "Settings")
+
+        self.tabs.currentChanged.connect(self.on_tab_changed)
 
         self.main_layout.addWidget(self.tabs)
 
@@ -327,7 +427,50 @@ class StockHawkDesktop(QMainWindow):
             table.setItem(row, col, item)
         return item
 
-    def update_data(self):
+    def _format_currency(self, value):
+        return f"\u20B9{value}"
+
+    def _sanitize_currency_text(self, text):
+        if not isinstance(text, str):
+            return text
+        return text.replace("Ã¢â€šÂ¹", "\u20B9").replace("â‚¹", "\u20B9")
+
+    def _sanitize_currency_table(self, table):
+        for row in range(table.rowCount()):
+            for col in range(table.columnCount()):
+                item = table.item(row, col)
+                if item:
+                    item.setText(self._sanitize_currency_text(item.text()))
+
+    def _refresh_and_render(self, *args):
+        """Fetches fresh data for user-triggered changes, then renders from cache."""
+        import kite_engine
+        from snapshot import snapshot_manager
+
+        selected_symbol = self.symbol_combo.currentText()
+        selected_expiry = self.expiry_combo.currentText()
+
+        kite_inst = getattr(self, "kite_instance", None)
+        if kite_inst:
+            real_market_data = kite_engine.fetch_real_market_data(
+                kite_inst,
+                symbol=selected_symbol,
+                expiry=selected_expiry,
+                depth=max(4, self.strike_spin.value() + 2),
+            )
+            if real_market_data:
+                snapshot_manager.save(real_market_data)
+                self.previous_market_data = self.latest_market_data
+                self.latest_market_data = real_market_data
+        elif self.latest_market_data is None:
+            self.latest_market_data = mock_generator.start_simulation_once()
+
+        self.render_latest_data()
+
+    def update_data(self, *args):
+        return self._refresh_and_render(*args)
+
+    def update_data_legacy(self):
         import kite_engine
         from snapshot import snapshot_manager
         
@@ -435,6 +578,7 @@ class StockHawkDesktop(QMainWindow):
         # 1. Get all milestone files and sort them by modified time (newest first)
         files = [os.path.join(milestone_folder, f) for f in os.listdir(milestone_folder) if f.endswith('.json')]
         files.sort(key=os.path.getmtime, reverse=True)
+        files = files[:20]
 
         self.monitor_table.setRowCount(len(files))
         
@@ -469,15 +613,15 @@ class StockHawkDesktop(QMainWindow):
             except Exception as e:
                 print(f"Error loading milestone {os.path.basename(filepath)}: {e}")
 
+        self._sanitize_currency_table(self.monitor_table)
+
     def refresh_alerts_table(self):
         """Reads alert.csv and updates the bottom table."""
         alerts = []
         # Note: Your notifier.py saves to 'alert.csv', ensure name matches
         if os.path.exists('alert.csv'):
             with open('alert.csv', mode='r', encoding='utf-8') as f:
-                reader = list(csv.reader(f))
-                # Get last 5 alerts, newest first
-                alerts = reader[-5:][::-1]
+                alerts = list(deque(csv.reader(f), maxlen=5))[::-1]
         else:
             self.alerts_table.setRowCount(0)
             return

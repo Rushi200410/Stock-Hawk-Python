@@ -87,3 +87,4 @@ def start_simulation_once():
     # Save this realistic snapshot
     snapshot_manager.save(market_snapshot)
     print(f"Recorded realistic data at {datetime.now().strftime('%H:%M:%S')}")
+    return market_snapshot

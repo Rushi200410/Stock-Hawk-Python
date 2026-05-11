@@ -1,160 +1,184 @@
-from kite_auth import KiteAuthenticator
 from datetime import datetime
-import config
-from kiteconnect import KiteTicker
-import pandas as pd
-import hawk_engine
 
-# Initialize the real Kite connection and load the saved token safely
+import config
+import hawk_engine
+from kite_auth import KiteAuthenticator
+from kiteconnect import KiteTicker
+
+# Initialize the real Kite connection and load the saved token safely.
 auth = KiteAuthenticator()
 auth.load_token()
 kite = auth.kite
 
-# Global variable to store instrument list in memory for fast lookup
-instruments_df = None
+# Cached instrument lookup for fast symbol resolution.
+instrument_lookup = {}
+instruments_loaded = False
+
 
 def load_instruments():
-    """Downloads and caches the instrument list for the day."""
-    global instruments_df
-    if instruments_df is not None: return
+    """Downloads and caches the instrument list once."""
+    global instruments_loaded, instrument_lookup
+    if instruments_loaded:
+        return
+
+    if not kite or not kite.access_token:
+        return
+
     print("Downloading instrument list...")
-    inst = kite.instruments("NFO") + kite.instruments("NSE") + kite.instruments("MCX")
-    instruments_df = pd.DataFrame(inst)
+    instrument_lookup = {}
 
-def get_token_and_symbol(symbol, expiry, strike, option_type):
-    global instruments_df
-    if instruments_df is None: return None, None
+    for exchange in ("NFO", "NSE", "MCX"):
+        try:
+            for row in kite.instruments(exchange):
+                tradingsymbol = row.get("tradingsymbol")
+                token = row.get("instrument_token")
+                if tradingsymbol and token is not None:
+                    instrument_lookup[(exchange, tradingsymbol)] = int(token)
+        except Exception as e:
+            print(f"Instrument load error for {exchange}: {e}")
 
-    exp_dt = pd.to_datetime(expiry)
-    
+    instruments_loaded = True
+
+
+def _build_option_symbol(symbol, expiry, strike, option_type):
+    """Builds a tradingsymbol string for NSE/MCX contracts."""
+    exp_dt = datetime.strptime(expiry, "%Y-%m-%d")
+
     if symbol == "CRUDEOIL":
-        # MCX Option Format: CRUDEOILYYMMMDDstrikeCE (e.g., CRUDEOIL26MAY189000CE)
-        # Note: Month is usually the short name 'MAY' or 'JUN'
         year = str(exp_dt.year)[-2:]
-        month_name = exp_dt.strftime('%b').upper()
-        # For Commodities, the symbol often omits the day for monthly contracts
+        month_name = exp_dt.strftime("%b").upper()
         tradingsymbol = f"CRUDEOIL{year}{month_name}{int(strike)}{option_type}"
         exchange = "MCX"
     else:
-        # NSE Option Format: NIFTY2651224000CE
         year = str(exp_dt.year)[-2:]
         month = exp_dt.month
         day = f"{exp_dt.day:02d}"
         tradingsymbol = f"{symbol}{year}{month}{day}{int(strike)}{option_type}"
         exchange = "NFO"
-    # Important: Search by both Symbol and Exchange to avoid duplicates
-    res = instruments_df[(instruments_df['tradingsymbol'] == tradingsymbol) & 
-                         (instruments_df['exchange'] == exchange)]
-                         
-    if not res.empty:
-        return int(res.iloc[0]['instrument_token']), tradingsymbol
+
+    return exchange, tradingsymbol
+
+
+def get_token_and_symbol(symbol, expiry, strike, option_type):
+    """Resolves an instrument token from the cached lookup table."""
+    if not instrument_lookup:
+        return None, None
+
+    exchange, tradingsymbol = _build_option_symbol(symbol, expiry, strike, option_type)
+    token = instrument_lookup.get((exchange, tradingsymbol))
+    if token is not None:
+        return token, tradingsymbol
     return None, None
 
-def fetch_real_market_data(kite_instance=None, symbol=None, expiry=None):
-    """Fetches real-time LTP and OI for Equity and MCX."""
+
+def fetch_real_market_data(kite_instance=None, symbol=None, expiry=None, depth=6):
+    """Fetches LTP and OI for the requested symbols with a small strike window."""
     k = kite_instance if kite_instance else kite
     if not k or not k.access_token:
-        print("❌ Kite Engine Error: No access token found. Please authenticate first.")
+        print("Kite Engine Error: No access token found. Please authenticate first.")
         return None
-        
-    market_snapshot = {}
+
     try:
         load_instruments()
-        # 1. Define instruments (Indices and MCX Crude)
-        instruments = ["NSE:NIFTY 50", "NSE:NIFTY BANK", "MCX:CRUDEOIL26MAYFUT"]
-        quotes = k.quote(instruments)
-        
+        if not instrument_lookup:
+            return None
+
+        base_quotes = ["NSE:NIFTY 50", "NSE:NIFTY BANK", "MCX:CRUDEOIL26MAYFUT"]
+        quotes = k.quote(base_quotes)
+
         symbols_to_fetch = [symbol] if symbol else config.SYMBOLS + ["CRUDEOIL"]
-        
+        market_snapshot = {}
+
         for sym in symbols_to_fetch:
             tradingsymbol = {
                 "NIFTY": "NSE:NIFTY 50",
                 "BANKNIFTY": "NSE:NIFTY BANK",
-                "CRUDEOIL": "MCX:CRUDEOIL26MAYFUT"
+                "CRUDEOIL": "MCX:CRUDEOIL26MAYFUT",
             }.get(sym)
-            
+
             if not tradingsymbol or tradingsymbol not in quotes:
                 continue
-            
+
             spot_price = quotes[tradingsymbol]["last_price"]
-            
-            # 2. Logic for Option Chain
             options_chain = []
-            if sym in ["NIFTY", "BANKNIFTY", "CRUDEOIL"]:
+
+            if sym in ("NIFTY", "BANKNIFTY", "CRUDEOIL"):
                 strike_step = 50 if sym == "NIFTY" else 100
                 atm_strike = round(spot_price / strike_step) * strike_step
 
-                # Get the nearest expiry for this symbol dynamically
                 expiries = hawk_engine.get_live_expiries().get(sym, [])
                 current_expiry = expiry if expiry else (expiries[0] if expiries else None)
                 if not current_expiry:
                     continue
-                tokens_to_fetch = []
+
+                tokens_to_fetch = set()
                 strike_map = {}
-                
                 exchange_prefix = "MCX" if sym == "CRUDEOIL" else "NFO"
-                
-                for i in range(-15, 15):
+                strike_window = max(3, int(depth))
+
+                for i in range(-strike_window, strike_window + 1):
                     strike = atm_strike + (i * strike_step)
                     ce_token, ce_sym = get_token_and_symbol(sym, current_expiry, strike, "CE")
                     pe_token, pe_sym = get_token_and_symbol(sym, current_expiry, strike, "PE")
-                    
-                    strike_map[strike] = {
-                        "isATM": bool(strike == atm_strike),
-                        "CE_sym": f"{exchange_prefix}:{ce_sym}" if ce_sym else None,
-                        "PE_sym": f"{exchange_prefix}:{pe_sym}" if pe_sym else None
-                    }
-                    
-                    if ce_sym: tokens_to_fetch.append(f"{exchange_prefix}:{ce_sym}")
-                    if pe_sym: tokens_to_fetch.append(f"{exchange_prefix}:{pe_sym}")
 
-                # 4. ONE SINGLE API CALL for the entire chain (Efficient!)
-                opt_quotes = k.quote(tokens_to_fetch) if tokens_to_fetch else {}
-                
+                    strike_map[strike] = {
+                        "isATM": strike == atm_strike,
+                        "CE_sym": f"{exchange_prefix}:{ce_sym}" if ce_sym else None,
+                        "PE_sym": f"{exchange_prefix}:{pe_sym}" if pe_sym else None,
+                    }
+
+                    if ce_sym:
+                        tokens_to_fetch.add(f"{exchange_prefix}:{ce_sym}")
+                    if pe_sym:
+                        tokens_to_fetch.add(f"{exchange_prefix}:{pe_sym}")
+
+                opt_quotes = k.quote(list(tokens_to_fetch)) if tokens_to_fetch else {}
+
                 for strike, data in strike_map.items():
                     ce_sym = data["CE_sym"]
                     pe_sym = data["PE_sym"]
-                    
                     ce_data = opt_quotes.get(ce_sym, {}) if ce_sym else {}
                     pe_data = opt_quotes.get(pe_sym, {}) if pe_sym else {}
-                    
-                    options_chain.append({
-                        "strikePrice": strike,
-                        "isATM": data["isATM"],
-                        "CE": {
-                            "LTP": ce_data.get("last_price", 0), 
-                            "OI": ce_data.get("oi", 0), 
-                            "changeInOI": 0
-                        },
-                        "PE": {
-                            "LTP": pe_data.get("last_price", 0), 
-                            "OI": pe_data.get("oi", 0), 
-                            "changeInOI": 0
+
+                    options_chain.append(
+                        {
+                            "strikePrice": strike,
+                            "isATM": data["isATM"],
+                            "CE": {
+                                "LTP": ce_data.get("last_price", 0),
+                                "OI": ce_data.get("oi", 0),
+                                "changeInOI": 0,
+                            },
+                            "PE": {
+                                "LTP": pe_data.get("last_price", 0),
+                                "OI": pe_data.get("oi", 0),
+                                "changeInOI": 0,
+                            },
                         }
-                    })
+                    )
 
             market_snapshot[sym] = {
                 "price": spot_price,
                 "time": datetime.now().strftime("%H:%M:%S"),
-                "optionsChain": options_chain
+                "optionsChain": options_chain,
             }
+
         return market_snapshot
+
     except Exception as e:
-        print(f"❌ Kite Data Error: {e}")
+        print(f"Kite Data Error: {e}")
         return None
 
-# --- WebSocket Implementation (The "Live Ticker") ---
+
 def start_ticker(api_key, access_token):
+    """Starts a small background ticker subscription."""
     kws = KiteTicker(api_key, access_token)
 
     def on_ticks(ws, ticks):
-        """Callback for streaming ticks."""
-        # Update your global 'current_prices' dictionary here if needed
         for tick in ticks:
             print(f"Live Tick - {tick['instrument_token']}: {tick['last_price']}")
 
     def on_connect(ws, response):
-        # Subscribe to NIFTY (256265) and BANKNIFTY (260105) tokens
         ws.subscribe([256265, 260105])
         ws.set_mode(ws.MODE_FULL, [256265, 260105])
 
@@ -162,7 +186,7 @@ def start_ticker(api_key, access_token):
     kws.on_connect = on_connect
     kws.connect(threaded=True)
 
+
 if kite.access_token:
-    # Uncomment the line below to start streaming ticks instantly in the background!
     # start_ticker(config.API_KEY, kite.access_token)
     pass
