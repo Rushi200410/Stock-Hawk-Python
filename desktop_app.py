@@ -5,7 +5,8 @@ import json
 from datetime import datetime
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QHBoxLayout, QLabel, QSpinBox, QComboBox, QPushButton,
-                             QTableWidget, QTableWidgetItem, QHeaderView, QTabWidget)
+                             QTableWidget, QTableWidgetItem, QHeaderView, QTabWidget,
+                             QLineEdit)
 from PyQt6.QtCore import QTimer, Qt
 from PyQt6.QtGui import QColor, QBrush, QFont
 
@@ -136,6 +137,11 @@ class StockHawkDesktop(QMainWindow):
         self.monitoring_tab = QWidget()
         self.setup_monitoring_tab()
         self.tabs.addTab(self.monitoring_tab, "Monitoring")
+
+        # --- TAB 3: SETTINGS (API Integration) ---
+        self.settings_tab = QWidget()
+        self.setup_settings_tab()
+        self.tabs.addTab(self.settings_tab, "Settings")
 
         self.main_layout.addWidget(self.tabs)
 
@@ -416,6 +422,34 @@ class StockHawkDesktop(QMainWindow):
                 if c == 2:
                     color = QColor("#00ff95") if "UP" in text else QColor("#ff4d4d")
                     item.setForeground(QBrush(color))
+
+    def setup_settings_tab(self):
+        layout = QVBoxLayout(self.settings_tab)
+        
+        layout.addWidget(QLabel("Kite Zerodha API Settings"))
+        
+        self.api_key_input = QLineEdit()
+        self.api_key_input.setPlaceholderText("Enter API Key")
+        self.api_key_input.setText(config.API_KEY)
+        layout.addWidget(self.api_key_input)
+        
+        self.api_secret_input = QLineEdit()
+        self.api_secret_input.setPlaceholderText("Enter API Secret")
+        self.api_secret_input.setEchoMode(QLineEdit.EchoMode.Password)
+        layout.addWidget(self.api_secret_input)
+        
+        self.login_btn = QPushButton("🔑 LOGIN TO KITE")
+        self.login_btn.clicked.connect(self.handle_kite_login)
+        layout.addWidget(self.login_btn)
+        
+        self.auth_status = QLabel("Status: Not Authenticated")
+        layout.addWidget(self.auth_status)
+        layout.addStretch()
+
+    def handle_kite_login(self):
+        # We'll wire this to the kite_worker flow in the next step
+        self.auth_status.setText("Status: Pending Authentication...")
+        print("Initiating Kite Connect Login...")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
