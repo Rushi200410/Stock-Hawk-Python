@@ -1,3 +1,9 @@
+kuv63vy7loc6bl0d
+6r64c7mqd4gqpcvt8aexqxd36lbc13tp
+
+f2dQmlEEdl3kLV9TAKnvdbMEsXca6lMD
+
+
 # Stock Hawk Engine
 
 This project is a small market-data simulator and pattern checker.

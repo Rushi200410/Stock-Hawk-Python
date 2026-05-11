@@ -1,6 +1,6 @@
 # API Credentials (Fill these when you buy the key later)
-API_KEY = "554rwe3bzbpkjajp" # Placeholder from your sample
-API_SECRET = "s9p4g8c72lq0h40ts969k7uoqvi7gydv" 
+API_KEY = "kuv63vy7loc6bl0d" # Placeholder from your sample
+API_SECRET = "6r64c7mqd4gqpcvt8aexqxd36lbc13tp" 
 ACCESS_TOKEN_FILE = "access_token.txt"
 
 # System Settings
