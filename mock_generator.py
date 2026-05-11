@@ -37,8 +37,8 @@ def start_simulation_once():
         # Find ATM (At The Money) strike
         atm_strike = round(new_price / strike_step) * strike_step
         
-        # Generate 5 strikes below and 5 above ATM (total 10 strikes)
-        strikes = [atm_strike + (i * strike_step) for i in range(-5, 5)]
+        # Generate 15 strikes below and 15 above ATM so the UI has enough data
+        strikes = [atm_strike + (i * strike_step) for i in range(-15, 15)]
         
         options_chain_data = []
         

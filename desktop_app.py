@@ -174,6 +174,14 @@ class StockHawkDesktop(QMainWindow):
         self.interval_combo.currentTextChanged.connect(self.update_interval_settings)
         control_layout.addWidget(self.interval_combo)
         
+        # Strike Count Control
+        control_layout.addWidget(QLabel("Strikes:"))
+        self.strike_spin = QSpinBox()
+        self.strike_spin.setRange(3, 10) # Min 3, Max 10
+        self.strike_spin.setValue(10) # Default to your current view
+        self.strike_spin.valueChanged.connect(self.update_data)
+        control_layout.addWidget(self.strike_spin)
+        
         # Symbol Selection
         self.symbol_combo = QComboBox()
         self.symbol_combo.addItems(config.SYMBOLS)
@@ -294,9 +302,29 @@ class StockHawkDesktop(QMainWindow):
                     opt["CE"]["changeInOI"] = opt["CE"]["OI"] - old_oi_map.get(strike, {"CE_OI": opt["CE"]["OI"]})["CE_OI"]
                     opt["PE"]["changeInOI"] = opt["PE"]["OI"] - old_oi_map.get(strike, {"PE_OI": opt["PE"]["OI"]})["PE_OI"]
 
+        # --- NEW: Variable Strike Depth Logic ---
+        num_strikes = self.strike_spin.value()
+        
+        # 1. Find the index of the ATM strike in the list
+        atm_index = -1
+        for i, opt in enumerate(current_chain):
+            if opt.get("isATM"):
+                atm_index = i
+                break
+        
+        # 2. Slice the list based on your formula:
+        # Rows Above = num_strikes
+        # Rows Below = num_strikes - 1
+        if atm_index != -1:
+            start = max(0, atm_index - num_strikes)
+            end = min(len(current_chain), atm_index + num_strikes)
+            display_chain = current_chain[start:end]
+        else:
+            display_chain = current_chain # Fallback
+
         # --- Populate Option Chain Table (No Flicker) ---
-        self.chain_table.setRowCount(len(current_chain))
-        for r, opt in enumerate(current_chain):
+        self.chain_table.setRowCount(len(display_chain))
+        for r, opt in enumerate(display_chain):
             bg_color = QColor(0, 255, 149, 38) if opt.get("isATM") else QColor("#1a1a1a")
             ce_change_color = QColor("#00ff95") if opt["CE"]["changeInOI"] > 0 else (QColor("#ff4d4d") if opt["CE"]["changeInOI"] < 0 else QColor("#e0e0e0"))
             pe_change_color = QColor("#00ff95") if opt["PE"]["changeInOI"] > 0 else (QColor("#ff4d4d") if opt["PE"]["changeInOI"] < 0 else QColor("#e0e0e0"))
