@@ -26,7 +26,7 @@ def send_telegram(message):
     try:
         requests.post(url, data=payload)
     except Exception as e:
-        print(f"❌ Telegram Error: {e}")
+        print(f"Telegram Error: {e}")
 
 def send_whatsapp(message):
     """Handles WhatsApp logic exclusively."""
@@ -36,7 +36,7 @@ def send_whatsapp(message):
         # wa.send(config.WHATSAPP_PHONE, clean_msg)
         pass # Placeholder while WhatsApp is disabled
     except Exception as e:
-        print(f"❌ WhatsApp Error: {e}")
+        print(f"WhatsApp Error: {e}")
 
 def log_to_csv(message, symbol, pattern):
     """Records the hit in your local database."""
@@ -45,4 +45,4 @@ def log_to_csv(message, symbol, pattern):
             writer = csv.writer(f)
             writer.writerow([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), symbol, pattern, message.replace('\n', ' ')])
     except Exception as e:
-        print(f"❌ CSV Logging Error: {e}")
+        print(f"CSV Logging Error: {e}")

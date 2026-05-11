@@ -72,7 +72,7 @@ HTML_TEMPLATE = """
             </select>
             
             <select id="expiry-select" style="background: #333; color: white; padding: 5px;">
-                <option value="24-MAY">24-MAY</option>
+                <option value="26-MAY">26-MAY</option>
             </select>
             
             <button style="background: #00ff95; color: black; border: none; padding: 5px 15px; font-weight: bold; cursor: pointer;">OPTION CHAIN</button>
@@ -119,18 +119,25 @@ HTML_TEMPLATE = """
 
     <script>
         // 1. Open the "Pipe" to Python
-        const ws = new WebSocket(`ws://${window.location.host}/ws`);
+        const wsProtocol = window.location.protocol === "https:" ? "wss" : "ws";
+        const ws = new WebSocket(`${wsProtocol}://${window.location.host}/ws`);
         
         let currentSymbol = "NIFTY";
 
+        function sendState(payload) {
+            if (ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify(payload));
+            }
+        }
+
         document.getElementById("symbol-select").addEventListener("change", (e) => {
             currentSymbol = e.target.value;
-            ws.send(JSON.stringify({ symbol: currentSymbol }));
+            sendState({ symbol: currentSymbol });
             document.getElementById("options-title").innerText = `${currentSymbol} Options Chain (Live)`;
         });
 
         document.getElementById("snap-count").addEventListener("change", (e) => {
-            ws.send(JSON.stringify({ snapshots: parseInt(e.target.value) }));
+            sendState({ snapshots: parseInt(e.target.value) });
         });
 
         // 2. Listen for JSON packets
@@ -221,10 +228,10 @@ async def websocket_endpoint(websocket: WebSocket):
                 data = await websocket.receive_json()
                 if "symbol" in data:
                     state["symbol"] = data["symbol"]
-                    print(f"🔄 Browser changed symbol to: {state['symbol']}")
+                    print(f"Browser changed symbol to: {state['symbol']}")
                 if "snapshots" in data:
                     state["snap_count"] = max(1, int(data["snapshots"]))
-                    print(f"🔄 Browser changed snapshots to: {state['snap_count']}")
+                    print(f"Browser changed snapshots to: {state['snap_count']}")
         except Exception as e:
             print(f"WebSocket Receiver Error: {e}")
 

@@ -34,7 +34,7 @@ def cleanup_old_snapshots(days=7):
         path = os.path.join(config.SNAPSHOT_FOLDER, f)
         if os.stat(path).st_mtime < (now - max_age):
             os.remove(path)
-            print(f"🧹 Cleaned up old snapshot: {f}")
+            print(f"Cleaned up old snapshot: {f}")
 
 snapshot_manager = SnapshotManager()
 
@@ -46,7 +46,7 @@ def cleanup_old_files():
         # 86400 seconds = 24 hours
         if os.stat(path).st_mtime < now - 86400:
             os.remove(path)
-            print(f"🧹 Janitor: Removed old file {f}")
+            print(f"Janitor removed old file {f}")
 
 
 def save_milestone(data, interval_name):
@@ -54,7 +54,8 @@ def save_milestone(data, interval_name):
     if not os.path.exists(config.MILESTONE_FOLDER):
         os.makedirs(config.MILESTONE_FOLDER)
     
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+    # Use seconds + microseconds so repeated saves in the same minute do not overwrite each other.
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
     filename = f"{interval_name}_{timestamp}.json"
     filepath = os.path.join(config.MILESTONE_FOLDER, filename)
     

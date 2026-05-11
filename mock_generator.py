@@ -22,12 +22,12 @@ def start_simulation_once():
     
     for sym in config.SYMBOLS:
         # Get the last price we recorded
-        last_price = current_prices.get(sym, 24000.0)
+        last_price = current_prices.get(sym, 0.0)
         
         # Calculate a small 'step' (between -2 and +2)
         # This makes the price move smoothly instead of jumping randomly
         change = random.uniform(-2.0, 2.0)
-        new_price = round(last_price + change, 2)
+        new_price = round(max(0.05, last_price + change), 2)
         
         # Update our memory for the next loop
         current_prices[sym] = new_price
@@ -86,4 +86,4 @@ def start_simulation_once():
     
     # Save this realistic snapshot
     snapshot_manager.save(market_snapshot)
-    print(f"📊 Recorded Realistic Data at {datetime.now().strftime('%H:%M:%S')}")
+    print(f"Recorded realistic data at {datetime.now().strftime('%H:%M:%S')}")

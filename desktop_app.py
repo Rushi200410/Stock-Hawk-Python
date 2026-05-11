@@ -66,16 +66,19 @@ class StockHawkDesktop(QMainWindow):
         import hawk_engine
         from snapshot import snapshot_manager, cleanup_old_files
         
-        # 1. CALL THE REAL API instead of mock_generator
+        # 1. Try real API data first. If Kite is not authenticated, fall back to the simulator
+        # so the app still works locally.
         real_market_data = kite_engine.fetch_real_market_data()
         
         if real_market_data:
             # 2. Save it as a snapshot so all your existing logic works!
             snapshot_manager.save(real_market_data)
+        else:
+            mock_generator.start_simulation_once()
             
-            # 3. Pattern analysis and cleanup
-            hawk_engine.check_for_patterns()
-            cleanup_old_files()
+        # 3. Pattern analysis and cleanup
+        hawk_engine.check_for_patterns()
+        cleanup_old_files()
             
         # Check if it's time for a Milestone Report
         if self.current_interval_minutes > 0:
@@ -92,7 +95,7 @@ class StockHawkDesktop(QMainWindow):
         else:
             self.current_interval_minutes = int(text.split(" ")[0])
             self.last_milestone_time = datetime.now()
-            print(f"⏱️ Milestone interval set to {self.current_interval_minutes} minutes")
+            print(f"Milestone interval set to {self.current_interval_minutes} minutes")
 
     def generate_interval_report(self):
         """Compares current price with the previous milestone."""
@@ -209,12 +212,13 @@ class StockHawkDesktop(QMainWindow):
         self.symbol_combo = QComboBox()
         self.symbol_combo.addItems(config.SYMBOLS)
         self.symbol_combo.currentTextChanged.connect(self.update_data) # Instantly update
+        self.symbol_combo.currentTextChanged.connect(self.refresh_expiry_list)
         control_layout.addWidget(self.symbol_combo)
         
         # Expiry Selection
         self.expiry_combo = QComboBox()
-        self.expiry_combo.addItem("24-MAY")
         control_layout.addWidget(self.expiry_combo)
+        self.refresh_expiry_list() # Populate initially based on default symbol
         
         # Option Chain Button
         btn_chain = QPushButton("OPTION CHAIN")
@@ -256,6 +260,15 @@ class StockHawkDesktop(QMainWindow):
         self.chain_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.chain_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         layout.addWidget(self.chain_table, stretch=2)
+
+    def refresh_expiry_list(self):
+        """Dynamically changes expiry options based on the selected asset."""
+        symbol = self.symbol_combo.currentText()
+        all_dates = hawk_engine.get_live_expiries()
+        
+        self.expiry_combo.clear()
+        if symbol in all_dates:
+            self.expiry_combo.addItems(all_dates[symbol])
 
     def setup_monitoring_tab(self):
         layout = QVBoxLayout(self.monitoring_tab)
@@ -380,17 +393,18 @@ class StockHawkDesktop(QMainWindow):
         """Populates the monitoring view with data from the milestones folder."""
         milestone_folder = config.MILESTONE_FOLDER
         if not os.path.exists(milestone_folder):
+            self.monitor_table.setRowCount(0)
             return
 
-        # 1. Get all milestone files and sort them by time (newest first)
-        files = [f for f in os.listdir(milestone_folder) if f.endswith('.json')]
-        files.sort(reverse=True) # Assuming filename has timestamp like YYYYMMDD_HHMM
+        # 1. Get all milestone files and sort them by modified time (newest first)
+        files = [os.path.join(milestone_folder, f) for f in os.listdir(milestone_folder) if f.endswith('.json')]
+        files.sort(key=os.path.getmtime, reverse=True)
 
         self.monitor_table.setRowCount(len(files))
         
-        for r, filename in enumerate(files):
+        for r, filepath in enumerate(files):
             try:
-                with open(os.path.join(milestone_folder, filename), 'r') as f:
+                with open(filepath, 'r') as f:
                     content = json.load(f)
                     m_type = content.get("type", "N/A")
                     data = content.get("data", {})
@@ -417,7 +431,7 @@ class StockHawkDesktop(QMainWindow):
                             color = QColor("#00ff95") if "Bullish" in text else QColor("#ff4d4d")
                             item.setForeground(QBrush(color))
             except Exception as e:
-                print(f"Error loading milestone {filename}: {e}")
+                print(f"Error loading milestone {os.path.basename(filepath)}: {e}")
 
     def refresh_alerts_table(self):
         """Reads alert.csv and updates the bottom table."""
@@ -428,6 +442,9 @@ class StockHawkDesktop(QMainWindow):
                 reader = list(csv.reader(f))
                 # Get last 5 alerts, newest first
                 alerts = reader[-5:][::-1]
+        else:
+            self.alerts_table.setRowCount(0)
+            return
 
         self.alerts_table.setRowCount(len(alerts))
         for r, row_data in enumerate(alerts):
