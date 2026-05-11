@@ -1,0 +1,857 @@
+{
+  "timestamp": "20260511_145848",
+  "data": {
+    "NIFTY": {
+      "price": 24007.27,
+      "time": "14:58:48",
+      "optionsChain": [
+        {
+          "strikePrice": 23250,
+          "isATM": false,
+          "CE": {
+            "LTP": 151.63,
+            "OI": 261321,
+            "changeInOI": 4404
+          },
+          "PE": {
+            "LTP": 99.13,
+            "OI": 571668,
+            "changeInOI": -2680
+          }
+        },
+        {
+          "strikePrice": 23300,
+          "isATM": false,
+          "CE": {
+            "LTP": 113.88,
+            "OI": 51265,
+            "changeInOI": -70
+          },
+          "PE": {
+            "LTP": 173.5,
+            "OI": 358034,
+            "changeInOI": 1225
+          }
+        },
+        {
+          "strikePrice": 23350,
+          "isATM": false,
+          "CE": {
+            "LTP": 177.23,
+            "OI": 454986,
+            "changeInOI": -3095
+          },
+          "PE": {
+            "LTP": 146.87,
+            "OI": 254813,
+            "changeInOI": -3237
+          }
+        },
+        {
+          "strikePrice": 23400,
+          "isATM": false,
+          "CE": {
+            "LTP": 150.65,
+            "OI": 68947,
+            "changeInOI": 1855
+          },
+          "PE": {
+            "LTP": 100.4,
+            "OI": 164804,
+            "changeInOI": 2915
+          }
+        },
+        {
+          "strikePrice": 23450,
+          "isATM": false,
+          "CE": {
+            "LTP": 79.33,
+            "OI": 469227,
+            "changeInOI": -2183
+          },
+          "PE": {
+            "LTP": 51.85,
+            "OI": 385632,
+            "changeInOI": -2656
+          }
+        },
+        {
+          "strikePrice": 23500,
+          "isATM": false,
+          "CE": {
+            "LTP": 103.37,
+            "OI": 274240,
+            "changeInOI": 4179
+          },
+          "PE": {
+            "LTP": 163.69,
+            "OI": 549442,
+            "changeInOI": 4532
+          }
+        },
+        {
+          "strikePrice": 23550,
+          "isATM": false,
+          "CE": {
+            "LTP": 38.09,
+            "OI": 244786,
+            "changeInOI": 2601
+          },
+          "PE": {
+            "LTP": 12.26,
+            "OI": 40534,
+            "changeInOI": -1936
+          }
+        },
+        {
+          "strikePrice": 23600,
+          "isATM": false,
+          "CE": {
+            "LTP": 188.49,
+            "OI": 402771,
+            "changeInOI": -392
+          },
+          "PE": {
+            "LTP": 106.98,
+            "OI": 353723,
+            "changeInOI": -1255
+          }
+        },
+        {
+          "strikePrice": 23650,
+          "isATM": false,
+          "CE": {
+            "LTP": 152.49,
+            "OI": 309356,
+            "changeInOI": 1533
+          },
+          "PE": {
+            "LTP": 163.2,
+            "OI": 155688,
+            "changeInOI": -4138
+          }
+        },
+        {
+          "strikePrice": 23700,
+          "isATM": false,
+          "CE": {
+            "LTP": 120.32,
+            "OI": 312173,
+            "changeInOI": -297
+          },
+          "PE": {
+            "LTP": 152.02,
+            "OI": 316801,
+            "changeInOI": -3721
+          }
+        },
+        {
+          "strikePrice": 23750,
+          "isATM": false,
+          "CE": {
+            "LTP": 151.07,
+            "OI": 288913,
+            "changeInOI": 1063
+          },
+          "PE": {
+            "LTP": 111.84,
+            "OI": 65738,
+            "changeInOI": -4471
+          }
+        },
+        {
+          "strikePrice": 23800,
+          "isATM": false,
+          "CE": {
+            "LTP": 265.74,
+            "OI": 396634,
+            "changeInOI": 1002
+          },
+          "PE": {
+            "LTP": 122.99,
+            "OI": 338387,
+            "changeInOI": -4495
+          }
+        },
+        {
+          "strikePrice": 23850,
+          "isATM": false,
+          "CE": {
+            "LTP": 49.82,
+            "OI": 127164,
+            "changeInOI": 1408
+          },
+          "PE": {
+            "LTP": 104.48,
+            "OI": 497949,
+            "changeInOI": -4581
+          }
+        },
+        {
+          "strikePrice": 23900,
+          "isATM": false,
+          "CE": {
+            "LTP": 32.37,
+            "OI": 328951,
+            "changeInOI": -2267
+          },
+          "PE": {
+            "LTP": 276.65,
+            "OI": 51732,
+            "changeInOI": 2052
+          }
+        },
+        {
+          "strikePrice": 23950,
+          "isATM": false,
+          "CE": {
+            "LTP": 16.64,
+            "OI": 70255,
+            "changeInOI": -2754
+          },
+          "PE": {
+            "LTP": 196.04,
+            "OI": 216307,
+            "changeInOI": -4677
+          }
+        },
+        {
+          "strikePrice": 24000,
+          "isATM": true,
+          "CE": {
+            "LTP": 5.94,
+            "OI": 432742,
+            "changeInOI": 1605
+          },
+          "PE": {
+            "LTP": 8.47,
+            "OI": 211013,
+            "changeInOI": -3810
+          }
+        },
+        {
+          "strikePrice": 24050,
+          "isATM": false,
+          "CE": {
+            "LTP": 124.34,
+            "OI": 282787,
+            "changeInOI": 1514
+          },
+          "PE": {
+            "LTP": 126.13,
+            "OI": 240153,
+            "changeInOI": -476
+          }
+        },
+        {
+          "strikePrice": 24100,
+          "isATM": false,
+          "CE": {
+            "LTP": 249.37,
+            "OI": 442825,
+            "changeInOI": 3730
+          },
+          "PE": {
+            "LTP": 73.85,
+            "OI": 82063,
+            "changeInOI": -786
+          }
+        },
+        {
+          "strikePrice": 24150,
+          "isATM": false,
+          "CE": {
+            "LTP": 99.95,
+            "OI": 52529,
+            "changeInOI": 3258
+          },
+          "PE": {
+            "LTP": 259.74,
+            "OI": 216959,
+            "changeInOI": -2907
+          }
+        },
+        {
+          "strikePrice": 24200,
+          "isATM": false,
+          "CE": {
+            "LTP": 65.87,
+            "OI": 303399,
+            "changeInOI": 3372
+          },
+          "PE": {
+            "LTP": 104.43,
+            "OI": 420428,
+            "changeInOI": 2798
+          }
+        },
+        {
+          "strikePrice": 24250,
+          "isATM": false,
+          "CE": {
+            "LTP": 19.69,
+            "OI": 408479,
+            "changeInOI": -594
+          },
+          "PE": {
+            "LTP": 292.13,
+            "OI": 505564,
+            "changeInOI": 4388
+          }
+        },
+        {
+          "strikePrice": 24300,
+          "isATM": false,
+          "CE": {
+            "LTP": 127.29,
+            "OI": 174691,
+            "changeInOI": -485
+          },
+          "PE": {
+            "LTP": 230.66,
+            "OI": 22865,
+            "changeInOI": -2007
+          }
+        },
+        {
+          "strikePrice": 24350,
+          "isATM": false,
+          "CE": {
+            "LTP": 121.5,
+            "OI": 224023,
+            "changeInOI": 3165
+          },
+          "PE": {
+            "LTP": 158.78,
+            "OI": 348362,
+            "changeInOI": 1090
+          }
+        },
+        {
+          "strikePrice": 24400,
+          "isATM": false,
+          "CE": {
+            "LTP": 147.24,
+            "OI": 318325,
+            "changeInOI": 3788
+          },
+          "PE": {
+            "LTP": 113.13,
+            "OI": 473461,
+            "changeInOI": 4338
+          }
+        },
+        {
+          "strikePrice": 24450,
+          "isATM": false,
+          "CE": {
+            "LTP": 37.28,
+            "OI": 376098,
+            "changeInOI": 654
+          },
+          "PE": {
+            "LTP": 42.49,
+            "OI": 42331,
+            "changeInOI": -2318
+          }
+        },
+        {
+          "strikePrice": 24500,
+          "isATM": false,
+          "CE": {
+            "LTP": 161.64,
+            "OI": 233284,
+            "changeInOI": 3541
+          },
+          "PE": {
+            "LTP": 98.73,
+            "OI": 176497,
+            "changeInOI": -2077
+          }
+        },
+        {
+          "strikePrice": 24550,
+          "isATM": false,
+          "CE": {
+            "LTP": 148.11,
+            "OI": 515729,
+            "changeInOI": -3502
+          },
+          "PE": {
+            "LTP": 180.78,
+            "OI": 313207,
+            "changeInOI": -4508
+          }
+        },
+        {
+          "strikePrice": 24600,
+          "isATM": false,
+          "CE": {
+            "LTP": 122.06,
+            "OI": 277170,
+            "changeInOI": 1474
+          },
+          "PE": {
+            "LTP": 281.26,
+            "OI": 171984,
+            "changeInOI": -2284
+          }
+        },
+        {
+          "strikePrice": 24650,
+          "isATM": false,
+          "CE": {
+            "LTP": 122.65,
+            "OI": 37221,
+            "changeInOI": 1665
+          },
+          "PE": {
+            "LTP": 159.07,
+            "OI": 154505,
+            "changeInOI": -3319
+          }
+        },
+        {
+          "strikePrice": 24700,
+          "isATM": false,
+          "CE": {
+            "LTP": 99.06,
+            "OI": 47927,
+            "changeInOI": -3968
+          },
+          "PE": {
+            "LTP": 220.75,
+            "OI": 140683,
+            "changeInOI": 981
+          }
+        }
+      ]
+    },
+    "BANKNIFTY": {
+      "price": 48049.62,
+      "time": "14:58:48",
+      "optionsChain": [
+        {
+          "strikePrice": 46500,
+          "isATM": false,
+          "CE": {
+            "LTP": 235.85,
+            "OI": 53439,
+            "changeInOI": 4405
+          },
+          "PE": {
+            "LTP": 240.53,
+            "OI": 7059,
+            "changeInOI": -2653
+          }
+        },
+        {
+          "strikePrice": 46600,
+          "isATM": false,
+          "CE": {
+            "LTP": 122.68,
+            "OI": 462657,
+            "changeInOI": 2346
+          },
+          "PE": {
+            "LTP": 13.0,
+            "OI": 307974,
+            "changeInOI": -4078
+          }
+        },
+        {
+          "strikePrice": 46700,
+          "isATM": false,
+          "CE": {
+            "LTP": 251.28,
+            "OI": 185152,
+            "changeInOI": 4870
+          },
+          "PE": {
+            "LTP": 222.14,
+            "OI": 114147,
+            "changeInOI": 2657
+          }
+        },
+        {
+          "strikePrice": 46800,
+          "isATM": false,
+          "CE": {
+            "LTP": 156.28,
+            "OI": 289572,
+            "changeInOI": -910
+          },
+          "PE": {
+            "LTP": 226.6,
+            "OI": 10716,
+            "changeInOI": 4041
+          }
+        },
+        {
+          "strikePrice": 46900,
+          "isATM": false,
+          "CE": {
+            "LTP": 136.18,
+            "OI": 208174,
+            "changeInOI": -827
+          },
+          "PE": {
+            "LTP": 130.8,
+            "OI": 61923,
+            "changeInOI": 4565
+          }
+        },
+        {
+          "strikePrice": 47000,
+          "isATM": false,
+          "CE": {
+            "LTP": 19.71,
+            "OI": 215802,
+            "changeInOI": -3442
+          },
+          "PE": {
+            "LTP": 119.34,
+            "OI": 58429,
+            "changeInOI": -1296
+          }
+        },
+        {
+          "strikePrice": 47100,
+          "isATM": false,
+          "CE": {
+            "LTP": 129.21,
+            "OI": 300186,
+            "changeInOI": 4945
+          },
+          "PE": {
+            "LTP": 188.85,
+            "OI": 463967,
+            "changeInOI": 3314
+          }
+        },
+        {
+          "strikePrice": 47200,
+          "isATM": false,
+          "CE": {
+            "LTP": 261.99,
+            "OI": 289772,
+            "changeInOI": 4506
+          },
+          "PE": {
+            "LTP": 176.22,
+            "OI": 355969,
+            "changeInOI": 1012
+          }
+        },
+        {
+          "strikePrice": 47300,
+          "isATM": false,
+          "CE": {
+            "LTP": 141.34,
+            "OI": 532164,
+            "changeInOI": -1071
+          },
+          "PE": {
+            "LTP": 85.47,
+            "OI": 206278,
+            "changeInOI": -1493
+          }
+        },
+        {
+          "strikePrice": 47400,
+          "isATM": false,
+          "CE": {
+            "LTP": 187.1,
+            "OI": 46875,
+            "changeInOI": 2236
+          },
+          "PE": {
+            "LTP": 86.58,
+            "OI": 497708,
+            "changeInOI": 1346
+          }
+        },
+        {
+          "strikePrice": 47500,
+          "isATM": false,
+          "CE": {
+            "LTP": 119.77,
+            "OI": 198372,
+            "changeInOI": 3441
+          },
+          "PE": {
+            "LTP": 232.99,
+            "OI": 409333,
+            "changeInOI": 2379
+          }
+        },
+        {
+          "strikePrice": 47600,
+          "isATM": false,
+          "CE": {
+            "LTP": 150.44,
+            "OI": 194417,
+            "changeInOI": -1180
+          },
+          "PE": {
+            "LTP": 218.7,
+            "OI": 30826,
+            "changeInOI": 3309
+          }
+        },
+        {
+          "strikePrice": 47700,
+          "isATM": false,
+          "CE": {
+            "LTP": 62.35,
+            "OI": 143158,
+            "changeInOI": -4472
+          },
+          "PE": {
+            "LTP": 171.45,
+            "OI": 191911,
+            "changeInOI": 18
+          }
+        },
+        {
+          "strikePrice": 47800,
+          "isATM": false,
+          "CE": {
+            "LTP": 42.51,
+            "OI": 190598,
+            "changeInOI": -300
+          },
+          "PE": {
+            "LTP": 164.04,
+            "OI": 483126,
+            "changeInOI": 2940
+          }
+        },
+        {
+          "strikePrice": 47900,
+          "isATM": false,
+          "CE": {
+            "LTP": 44.92,
+            "OI": 149913,
+            "changeInOI": -2493
+          },
+          "PE": {
+            "LTP": 152.05,
+            "OI": 184854,
+            "changeInOI": -443
+          }
+        },
+        {
+          "strikePrice": 48000,
+          "isATM": true,
+          "CE": {
+            "LTP": 147.84,
+            "OI": 229708,
+            "changeInOI": -1911
+          },
+          "PE": {
+            "LTP": 52.41,
+            "OI": 368676,
+            "changeInOI": 3871
+          }
+        },
+        {
+          "strikePrice": 48100,
+          "isATM": false,
+          "CE": {
+            "LTP": 225.25,
+            "OI": 385691,
+            "changeInOI": 2957
+          },
+          "PE": {
+            "LTP": 250.59,
+            "OI": 119016,
+            "changeInOI": 382
+          }
+        },
+        {
+          "strikePrice": 48200,
+          "isATM": false,
+          "CE": {
+            "LTP": 81.01,
+            "OI": 360424,
+            "changeInOI": -277
+          },
+          "PE": {
+            "LTP": 156.09,
+            "OI": 397653,
+            "changeInOI": 3571
+          }
+        },
+        {
+          "strikePrice": 48300,
+          "isATM": false,
+          "CE": {
+            "LTP": 182.46,
+            "OI": 379053,
+            "changeInOI": 2441
+          },
+          "PE": {
+            "LTP": 122.42,
+            "OI": 441813,
+            "changeInOI": -1326
+          }
+        },
+        {
+          "strikePrice": 48400,
+          "isATM": false,
+          "CE": {
+            "LTP": 129.78,
+            "OI": 145837,
+            "changeInOI": 3432
+          },
+          "PE": {
+            "LTP": 165.49,
+            "OI": 503559,
+            "changeInOI": -1105
+          }
+        },
+        {
+          "strikePrice": 48500,
+          "isATM": false,
+          "CE": {
+            "LTP": 121.15,
+            "OI": 159723,
+            "changeInOI": -4605
+          },
+          "PE": {
+            "LTP": 35.46,
+            "OI": 587246,
+            "changeInOI": 796
+          }
+        },
+        {
+          "strikePrice": 48600,
+          "isATM": false,
+          "CE": {
+            "LTP": 98.96,
+            "OI": 449169,
+            "changeInOI": 1615
+          },
+          "PE": {
+            "LTP": 149.82,
+            "OI": 489819,
+            "changeInOI": -2031
+          }
+        },
+        {
+          "strikePrice": 48700,
+          "isATM": false,
+          "CE": {
+            "LTP": 90.38,
+            "OI": 213407,
+            "changeInOI": 4591
+          },
+          "PE": {
+            "LTP": 18.13,
+            "OI": 454886,
+            "changeInOI": 2402
+          }
+        },
+        {
+          "strikePrice": 48800,
+          "isATM": false,
+          "CE": {
+            "LTP": 188.01,
+            "OI": 19238,
+            "changeInOI": -1325
+          },
+          "PE": {
+            "LTP": 113.75,
+            "OI": 229822,
+            "changeInOI": -4565
+          }
+        },
+        {
+          "strikePrice": 48900,
+          "isATM": false,
+          "CE": {
+            "LTP": 162.9,
+            "OI": 503031,
+            "changeInOI": 2011
+          },
+          "PE": {
+            "LTP": 106.4,
+            "OI": 214230,
+            "changeInOI": -4577
+          }
+        },
+        {
+          "strikePrice": 49000,
+          "isATM": false,
+          "CE": {
+            "LTP": 209.8,
+            "OI": 260886,
+            "changeInOI": 2535
+          },
+          "PE": {
+            "LTP": 122.99,
+            "OI": 299151,
+            "changeInOI": 1064
+          }
+        },
+        {
+          "strikePrice": 49100,
+          "isATM": false,
+          "CE": {
+            "LTP": 121.92,
+            "OI": 431257,
+            "changeInOI": 4831
+          },
+          "PE": {
+            "LTP": 95.13,
+            "OI": 116900,
+            "changeInOI": -3913
+          }
+        },
+        {
+          "strikePrice": 49200,
+          "isATM": false,
+          "CE": {
+            "LTP": 119.28,
+            "OI": 350125,
+            "changeInOI": -628
+          },
+          "PE": {
+            "LTP": 87.91,
+            "OI": 432234,
+            "changeInOI": 2757
+          }
+        },
+        {
+          "strikePrice": 49300,
+          "isATM": false,
+          "CE": {
+            "LTP": 159.05,
+            "OI": 436531,
+            "changeInOI": -628
+          },
+          "PE": {
+            "LTP": 70.92,
+            "OI": 317134,
+            "changeInOI": -1972
+          }
+        },
+        {
+          "strikePrice": 49400,
+          "isATM": false,
+          "CE": {
+            "LTP": 177.85,
+            "OI": 77863,
+            "changeInOI": -2501
+          },
+          "PE": {
+            "LTP": 61.25,
+            "OI": 499772,
+            "changeInOI": 4271
+          }
+        }
+      ]
+    }
+  }
+}
