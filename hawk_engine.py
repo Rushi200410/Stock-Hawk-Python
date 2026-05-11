@@ -120,6 +120,6 @@ def get_live_expiries():
     """Generates a list of valid expiry dates based on 2026 rules."""
     return {
         "NIFTY": ["2026-05-12", "2026-05-19", "2026-05-26"],
-        "BANKNIFTY": ["2026-05-12", "2026-05-19"],
-        "CRUDEOIL": ["2026-05-18"],
+        "BANKNIFTY": ["2026-05-12", "2026-05-19", "2026-05-26"],
+        "CRUDEOIL": ["2026-05-18", "2026-06-16"],
     }

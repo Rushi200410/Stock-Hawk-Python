@@ -18,7 +18,7 @@ def load_instruments():
     global instruments_df
     if instruments_df is not None: return
     print("Downloading instrument list...")
-    inst = kite.instruments("NFO") + kite.instruments("NSE")
+    inst = kite.instruments("NFO") + kite.instruments("NSE") + kite.instruments("MCX")
     instruments_df = pd.DataFrame(inst)
 
 def get_token_and_symbol(symbol, expiry, strike, option_type):
@@ -30,13 +30,23 @@ def get_token_and_symbol(symbol, expiry, strike, option_type):
     if instruments_df is None: return None, None
 
     exp_dt = pd.to_datetime(expiry)
-    year = str(exp_dt.year)[-2:]
-    month = exp_dt.month
-    day = f"{exp_dt.day:02d}"
     
-    tradingsymbol = f"{symbol}{year}{month}{day}{int(strike)}{option_type}"
+    if symbol == "CRUDEOIL":
+        # MCX Option Format: CRUDEOILYYMM strike CE (e.g., CRUDEOIL26MAY6500CE)
+        year = str(exp_dt.year)[-2:]
+        month_name = exp_dt.strftime('%b').upper() # MAY, JUN, etc.
+        tradingsymbol = f"CRUDEOIL{year}{month_name}{int(strike)}{option_type}"
+        exchange = "MCX"
+    else:
+        # NSE Option Format: NIFTY2651224000CE
+        year = str(exp_dt.year)[-2:]
+        month = exp_dt.month
+        day = f"{exp_dt.day:02d}"
+        tradingsymbol = f"{symbol}{year}{month}{day}{int(strike)}{option_type}"
+        exchange = "NFO"
     
-    res = instruments_df[instruments_df['tradingsymbol'] == tradingsymbol]
+    res = instruments_df[(instruments_df['tradingsymbol'] == tradingsymbol) & 
+                         (instruments_df['exchange'] == exchange)]
     if not res.empty:
         return int(res.iloc[0]['instrument_token']), tradingsymbol
     return None, None
@@ -79,6 +89,8 @@ def fetch_real_market_data():
                 tokens_to_fetch = []
                 strike_map = {}
                 
+                exchange_prefix = "MCX" if sym == "CRUDEOIL" else "NFO"
+                
                 for i in range(-15, 15):
                     strike = atm_strike + (i * strike_step)
                     ce_token, ce_sym = get_token_and_symbol(sym, expiry, strike, "CE")
@@ -86,12 +98,12 @@ def fetch_real_market_data():
                     
                     strike_map[strike] = {
                         "isATM": bool(strike == atm_strike),
-                        "CE_sym": f"NFO:{ce_sym}" if ce_sym else None,
-                        "PE_sym": f"NFO:{pe_sym}" if pe_sym else None
+                        "CE_sym": f"{exchange_prefix}:{ce_sym}" if ce_sym else None,
+                        "PE_sym": f"{exchange_prefix}:{pe_sym}" if pe_sym else None
                     }
                     
-                    if ce_sym: tokens_to_fetch.append(f"NFO:{ce_sym}")
-                    if pe_sym: tokens_to_fetch.append(f"NFO:{pe_sym}")
+                    if ce_sym: tokens_to_fetch.append(f"{exchange_prefix}:{ce_sym}")
+                    if pe_sym: tokens_to_fetch.append(f"{exchange_prefix}:{pe_sym}")
 
                 # 4. ONE SINGLE API CALL for the entire chain (Efficient!)
                 opt_quotes = kite.quote(tokens_to_fetch) if tokens_to_fetch else {}

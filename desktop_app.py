@@ -89,6 +89,12 @@ class StockHawkDesktop(QMainWindow):
                 self.generate_interval_report()
                 self.last_milestone_time = now
 
+    def manual_refresh(self):
+        """Force an immediate data update without waiting for the 3-second timer."""
+        print("🔄 Manual refresh triggered...")
+        self.run_engine_step() # Trigger background fetch
+        self.update_data()      # Update UI immediately
+
     def update_interval_settings(self, text):
         if text == "OFF":
             self.current_interval_minutes = 0
@@ -210,7 +216,7 @@ class StockHawkDesktop(QMainWindow):
         
         # Symbol Selection
         self.symbol_combo = QComboBox()
-        self.symbol_combo.addItems(config.SYMBOLS)
+        self.symbol_combo.addItems(["NIFTY", "BANKNIFTY", "CRUDEOIL"])
         self.symbol_combo.currentTextChanged.connect(self.update_data) # Instantly update
         self.symbol_combo.currentTextChanged.connect(self.refresh_expiry_list)
         control_layout.addWidget(self.symbol_combo)
@@ -223,6 +229,18 @@ class StockHawkDesktop(QMainWindow):
         # Option Chain Button
         btn_chain = QPushButton("OPTION CHAIN")
         control_layout.addWidget(btn_chain)
+        
+        self.refresh_btn = QPushButton("🔄 REFRESH")
+        self.refresh_btn.setStyleSheet("""
+            QPushButton { 
+                background-color: #00ff95; color: black; font-weight: bold; 
+                padding: 5px 15px; border-radius: 4px;
+            }
+            QPushButton:hover { background-color: #00cc7a; }
+        """)
+        self.refresh_btn.clicked.connect(self.manual_refresh)
+        control_layout.addWidget(self.refresh_btn)
+        
         control_layout.addStretch()
         
         # Real-time Clock Label
