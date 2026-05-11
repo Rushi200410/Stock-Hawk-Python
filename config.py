@@ -14,9 +14,9 @@
 
 # ──────────────────────────────────────────
 
-API_KEY = "554rwe3bzbpkjajp" # Your Kite Connect API key from kite.trade
+API_KEY = "kuv63vy7loc6bl0d" # Your Kite Connect API key from kite.trade
 
-API_SECRET = "s9p4g8c72lq0h40ts969k7uoqvi7gydv" # Your API secret
+API_SECRET = "6r64c7mqd4gqpcvt8aexqxd36lbc13tp" # Your API secret
 
 ACCESS_TOKEN_FILE = "access_token.txt" # Stored after first login
 
