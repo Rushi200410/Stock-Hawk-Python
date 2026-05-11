@@ -209,8 +209,8 @@ class StockHawkDesktop(QMainWindow):
         # Strike Count Control
         control_layout.addWidget(QLabel("Strikes:"))
         self.strike_spin = QSpinBox()
-        self.strike_spin.setRange(3, 10) # Min 3, Max 10
-        self.strike_spin.setValue(10) # Default to your current view
+        self.strike_spin.setRange(1, 10) # Min 3, Max 10
+        self.strike_spin.setValue(1) # Default to your current view
         self.strike_spin.valueChanged.connect(self.update_data)
         control_layout.addWidget(self.strike_spin)
         
@@ -328,12 +328,30 @@ class StockHawkDesktop(QMainWindow):
         return item
 
     def update_data(self):
+        import kite_engine
+        from snapshot import snapshot_manager
+        
+        # 1. Capture user selection from the GUI
+        selected_symbol = self.symbol_combo.currentText()
+        selected_expiry = self.expiry_combo.currentText()
+        
+        # 2. Tell the engine which asset to fetch
+        kite_inst = getattr(self, 'kite_instance', None)
+        if kite_inst:
+            real_market_data = kite_engine.fetch_real_market_data(
+                kite_inst, 
+                symbol=selected_symbol, 
+                expiry=selected_expiry
+            )
+            if real_market_data:
+                snapshot_manager.save(real_market_data)
+                
         snap_count = self.snap_spin.value()
         history = hawk_engine.get_history(limit=snap_count + 1)
         if not history: return
         
         live_data = history[0]['data']
-        sym = self.symbol_combo.currentText()
+        sym = selected_symbol
         
         if sym not in live_data: return
         current_chain = live_data[sym].get("optionsChain", [])
