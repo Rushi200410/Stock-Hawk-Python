@@ -3,6 +3,7 @@ import config
 import csv
 from datetime import datetime
 # from wabridge import WABridge  # Import the WhatsApp bridge
+from app_logger import logger
 
 # Initialize the WhatsApp connection
 # wa = WABridge()
@@ -24,9 +25,9 @@ def send_telegram(message):
     url = f"https://api.telegram.org/bot{config.TELEGRAM_TOKEN}/sendMessage"
     payload = {"chat_id": config.TELEGRAM_CHAT_ID, "text": message, "parse_mode": "Markdown"}
     try:
-        requests.post(url, data=payload, timeout=5)
+        requests.post(url, data=payload)
     except Exception as e:
-        print(f"Telegram Error: {e}")
+        logger.error("Telegram Error: %s", e)
 
 def send_whatsapp(message):
     """Handles WhatsApp logic exclusively."""
@@ -36,7 +37,7 @@ def send_whatsapp(message):
         # wa.send(config.WHATSAPP_PHONE, clean_msg)
         pass # Placeholder while WhatsApp is disabled
     except Exception as e:
-        print(f"WhatsApp Error: {e}")
+        logger.error("WhatsApp Error: %s", e)
 
 def log_to_csv(message, symbol, pattern):
     """Records the hit in your local database."""
@@ -45,4 +46,6 @@ def log_to_csv(message, symbol, pattern):
             writer = csv.writer(f)
             writer.writerow([datetime.now().strftime("%Y-%m-%d %H:%M:%S"), symbol, pattern, message.replace('\n', ' ')])
     except Exception as e:
-        print(f"CSV Logging Error: {e}")
+        logger.error("CSV Logging Error: %s", e)
+
+    logger.warning("ALERT | %s | %s | %s", symbol, pattern, message)

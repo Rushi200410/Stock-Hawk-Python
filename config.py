@@ -6,7 +6,7 @@ ACCESS_TOKEN_FILE = "S9eysvY19648je0yK99AaFkAZ7FECEtL" # This will be created by
 # System Settings
 SNAPSHOT_FOLDER = "snapshots" # Folder where data is saved
 MILESTONE_FOLDER = "milestones" # For permanent interval-based data
-FETCH_INTERVAL = 1 # How many seconds between each data pull
+FETCH_INTERVAL = 3 # How many seconds between each data pull
 
 # The symbols we want to track
 SYMBOLS = ["NIFTY", "BANKNIFTY"]

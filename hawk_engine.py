@@ -1,11 +1,8 @@
 import os
 import json
-import time
 import config
 from notifier import send_master_alert
-
-
-_last_pattern_check = 0.0
+from app_logger import logger
 
 
 def calculate_market_metrics(chain_data):
@@ -38,8 +35,7 @@ def get_history(limit=100):
     if not os.path.exists(config.SNAPSHOT_FOLDER):
         return []
 
-    with os.scandir(config.SNAPSHOT_FOLDER) as entries:
-        files = [entry.path for entry in entries if entry.is_file()]
+    files = [os.path.join(config.SNAPSHOT_FOLDER, f) for f in os.listdir(config.SNAPSHOT_FOLDER)]
     files.sort(key=os.path.getmtime, reverse=True)
 
     history = []
@@ -86,18 +82,12 @@ def check_trend(history):
 
 def check_for_patterns():
     """Detects a simple SMA crossover pattern and logs alerts."""
-    global _last_pattern_check
-    now = time.monotonic()
-    if now - _last_pattern_check < 15:
-        return
-    _last_pattern_check = now
-
     history = get_history(limit=50)
 
     for sym in config.SYMBOLS:
         recent_prices = _get_symbol_prices(history, sym, limit=20)
         if len(recent_prices) < 20:
-            print(f"Building trend data for {sym}... ({len(recent_prices)}/20)")
+            logger.info("Building trend data for %s... (%s/20)", sym, len(recent_prices))
             continue
 
         current_price = recent_prices[0]
@@ -110,11 +100,11 @@ def check_for_patterns():
 
         if prev_price <= sma_20 and current_price > sma_20:
             msg = f"BULLISH CROSSOVER: {sym} crossed above SMA-20 at {current_price}!"
-            print(msg)
+            logger.warning(msg)
             send_master_alert(msg, symbol=sym, pattern="SMA_CROSS_UP")
         elif prev_price >= sma_20 and current_price < sma_20:
             msg = f"BEARISH CROSSOVER: {sym} dropped below SMA-20 at {current_price}!"
-            print(msg)
+            logger.warning(msg)
             send_master_alert(msg, symbol=sym, pattern="SMA_CROSS_DOWN")
 
 
@@ -124,12 +114,11 @@ def compare_milestones(current_data, interval_mins):
         return None
 
     prefix = f"{interval_mins}m_"
-    with os.scandir(config.MILESTONE_FOLDER) as entries:
-        files = [
-            entry.path
-            for entry in entries
-            if entry.is_file() and entry.name.startswith(prefix)
-        ]
+    files = [
+        os.path.join(config.MILESTONE_FOLDER, f)
+        for f in os.listdir(config.MILESTONE_FOLDER)
+        if f.startswith(prefix)
+    ]
     files.sort(key=os.path.getmtime, reverse=True)
 
     if len(files) < 2:
@@ -140,7 +129,7 @@ def compare_milestones(current_data, interval_mins):
             prev_milestone = json.load(prev_file)
             prev_data = prev_milestone.get("data", {})
     except Exception as e:
-        print(f"Error loading previous milestone: {e}")
+        logger.error("Error loading previous milestone: %s", e)
         return None
 
     reports = [f"{interval_mins} Min Market Report"]
