@@ -1,7 +1,11 @@
 import os
 import json
+import time
 import config
 from notifier import send_master_alert
+
+
+_last_pattern_check = 0.0
 
 
 def calculate_market_metrics(chain_data):
@@ -34,7 +38,8 @@ def get_history(limit=100):
     if not os.path.exists(config.SNAPSHOT_FOLDER):
         return []
 
-    files = [os.path.join(config.SNAPSHOT_FOLDER, f) for f in os.listdir(config.SNAPSHOT_FOLDER)]
+    with os.scandir(config.SNAPSHOT_FOLDER) as entries:
+        files = [entry.path for entry in entries if entry.is_file()]
     files.sort(key=os.path.getmtime, reverse=True)
 
     history = []
@@ -81,6 +86,12 @@ def check_trend(history):
 
 def check_for_patterns():
     """Detects a simple SMA crossover pattern and logs alerts."""
+    global _last_pattern_check
+    now = time.monotonic()
+    if now - _last_pattern_check < 15:
+        return
+    _last_pattern_check = now
+
     history = get_history(limit=50)
 
     for sym in config.SYMBOLS:
@@ -113,11 +124,12 @@ def compare_milestones(current_data, interval_mins):
         return None
 
     prefix = f"{interval_mins}m_"
-    files = [
-        os.path.join(config.MILESTONE_FOLDER, f)
-        for f in os.listdir(config.MILESTONE_FOLDER)
-        if f.startswith(prefix)
-    ]
+    with os.scandir(config.MILESTONE_FOLDER) as entries:
+        files = [
+            entry.path
+            for entry in entries
+            if entry.is_file() and entry.name.startswith(prefix)
+        ]
     files.sort(key=os.path.getmtime, reverse=True)
 
     if len(files) < 2:

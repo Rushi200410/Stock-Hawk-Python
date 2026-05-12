@@ -5,10 +5,10 @@ import hawk_engine
 from kite_auth import KiteAuthenticator
 from kiteconnect import KiteTicker
 
-# Initialize the real Kite connection and load the saved token safely.
+# Initialize the real Kite connection. Token loading is lazy so import stays fast.
 auth = KiteAuthenticator()
-auth.load_token()
 kite = auth.kite
+_auth_loaded = False
 
 # Cached instrument lookup for fast symbol resolution.
 instrument_lookup = {}
@@ -38,6 +38,15 @@ def load_instruments():
             print(f"Instrument load error for {exchange}: {e}")
 
     instruments_loaded = True
+
+
+def ensure_auth_loaded():
+    """Loads a saved token once, without doing a blocking profile check."""
+    global _auth_loaded
+    if _auth_loaded:
+        return
+    auth.load_token(validate=False)
+    _auth_loaded = True
 
 
 def _build_option_symbol(symbol, expiry, strike, option_type):
@@ -73,6 +82,8 @@ def get_token_and_symbol(symbol, expiry, strike, option_type):
 
 def fetch_real_market_data(kite_instance=None, symbol=None, expiry=None, depth=6):
     """Fetches LTP and OI for the requested symbols with a small strike window."""
+    if kite_instance is None:
+        ensure_auth_loaded()
     k = kite_instance if kite_instance else kite
     if not k or not k.access_token:
         print("Kite Engine Error: No access token found. Please authenticate first.")
@@ -172,6 +183,7 @@ def fetch_real_market_data(kite_instance=None, symbol=None, expiry=None, depth=6
 
 def start_ticker(api_key, access_token):
     """Starts a small background ticker subscription."""
+    ensure_auth_loaded()
     kws = KiteTicker(api_key, access_token)
 
     def on_ticks(ws, ticks):
