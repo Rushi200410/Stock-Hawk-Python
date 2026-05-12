@@ -86,7 +86,6 @@ def check_for_patterns():
     for sym in config.SYMBOLS:
         recent_prices = _get_symbol_prices(history, sym, limit=20)
         if len(recent_prices) < 20:
-            print(f"Building trend data for {sym}... ({len(recent_prices)}/20)")
             continue
 
         current_price = recent_prices[0]

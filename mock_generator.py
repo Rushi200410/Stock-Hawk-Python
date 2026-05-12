@@ -3,7 +3,6 @@ import random
 from datetime import datetime
 from snapshot import snapshot_manager
 import config
-from app_logger import logger
 
 # We store the "current" price in a variable so it persists between loops
 current_prices = {
@@ -87,6 +86,3 @@ def start_simulation_once():
     
     # Save this realistic snapshot
     snapshot_manager.save(market_snapshot)
-    logger.info("Recorded realistic data at %s", datetime.now().strftime("%H:%M:%S"))
-    return market_snapshot
-

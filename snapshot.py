@@ -34,7 +34,6 @@ def cleanup_old_snapshots(days=7):
         path = os.path.join(config.SNAPSHOT_FOLDER, f)
         if os.stat(path).st_mtime < (now - max_age):
             os.remove(path)
-            print(f"Cleaned up old snapshot: {f}")
 
 snapshot_manager = SnapshotManager()
 
@@ -46,4 +45,3 @@ def cleanup_old_files():
         # 86400 seconds = 24 hours
         if os.stat(path).st_mtime < now - 86400:
             os.remove(path)
-            print(f"Janitor removed old file {f}")
