@@ -2,7 +2,6 @@ import os
 import json
 import config
 from notifier import send_master_alert
-from app_logger import logger
 
 
 def calculate_market_metrics(chain_data):
@@ -87,7 +86,7 @@ def check_for_patterns():
     for sym in config.SYMBOLS:
         recent_prices = _get_symbol_prices(history, sym, limit=20)
         if len(recent_prices) < 20:
-            logger.info("Building trend data for %s... (%s/20)", sym, len(recent_prices))
+            print(f"Building trend data for {sym}... ({len(recent_prices)}/20)")
             continue
 
         current_price = recent_prices[0]
@@ -100,46 +99,28 @@ def check_for_patterns():
 
         if prev_price <= sma_20 and current_price > sma_20:
             msg = f"BULLISH CROSSOVER: {sym} crossed above SMA-20 at {current_price}!"
-            logger.warning(msg)
+            print(msg)
             send_master_alert(msg, symbol=sym, pattern="SMA_CROSS_UP")
         elif prev_price >= sma_20 and current_price < sma_20:
             msg = f"BEARISH CROSSOVER: {sym} dropped below SMA-20 at {current_price}!"
-            logger.warning(msg)
+            print(msg)
             send_master_alert(msg, symbol=sym, pattern="SMA_CROSS_DOWN")
 
 
-def compare_milestones(current_data, interval_mins):
-    """Generates a text report comparing current prices with the last saved milestone."""
-    if not os.path.exists(config.MILESTONE_FOLDER):
+def compare_interval_data(current_data, reference_data, interval_mins):
+    """Generates a text report comparing current data with the reference memory snapshot."""
+    if not reference_data:
         return None
 
-    prefix = f"{interval_mins}m_"
-    files = [
-        os.path.join(config.MILESTONE_FOLDER, f)
-        for f in os.listdir(config.MILESTONE_FOLDER)
-        if f.startswith(prefix)
-    ]
-    files.sort(key=os.path.getmtime, reverse=True)
-
-    if len(files) < 2:
-        return f"First milestone for {interval_mins}m recorded. Waiting for next interval to compare."
-
-    try:
-        with open(files[1], "r", encoding="utf-8") as prev_file:
-            prev_milestone = json.load(prev_file)
-            prev_data = prev_milestone.get("data", {})
-    except Exception as e:
-        logger.error("Error loading previous milestone: %s", e)
-        return None
-
-    reports = [f"{interval_mins} Min Market Report"]
+    reports = [f"📊 {interval_mins} Min Market Update"]
     for sym in current_data:
-        curr_price = current_data[sym]["price"]
-        if sym in prev_data:
-            prev_price = prev_data[sym]["price"]
+        curr_price = current_data[sym].get("price", 0)
+        if sym in reference_data:
+            prev_price = reference_data[sym].get("price", 0)
             diff = round(curr_price - prev_price, 2)
-            status = "INCREASED" if diff > 0 else ("DECREASED" if diff < 0 else "UNCHANGED")
-            reports.append(f"- {sym}: {status} by {abs(diff)} (Now: {curr_price})")
+            status = "📈 UP" if diff > 0 else ("📉 DOWN" if diff < 0 else "FLAT")
+            if diff != 0:
+                reports.append(f"- {sym}: {status} by {abs(diff)} (Now: {curr_price})")
 
     return "\n".join(reports) if len(reports) > 1 else None
 

@@ -4,7 +4,7 @@ import csv
 import json
 import time
 import threading
-from datetime import datetime
+from datetime import datetime, timedelta
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout,
                              QHBoxLayout, QLabel, QSpinBox, QComboBox, QPushButton,
                              QTableWidget, QTableWidgetItem, QHeaderView, QTabWidget,
@@ -13,7 +13,6 @@ from PyQt6.QtCore import QTimer, Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QBrush, QFont
 from kiteconnect import KiteConnect
 from kite_auth import KiteAuthenticator
-from app_logger import logger
 
 import hawk_engine
 import config
@@ -32,9 +31,9 @@ class StockHawkDesktop(QMainWindow):
         self.kite_instance = None
         self.latest_market_data = None
         self.previous_market_data = None
-        self.refresh_lock = threading.Lock()
-        self.refresh_in_progress = False
-        self.pending_refresh = False
+        self.interval_reference_data = None
+        self.monitor_display_start_data = None
+        self.monitor_display_end_data = None
         self.last_pattern_check_ts = 0.0
         self.last_aux_refresh_ts = 0.0
         self.last_cleanup_ts = 0.0
@@ -71,49 +70,106 @@ class StockHawkDesktop(QMainWindow):
 
     def run_engine_step(self):
         """Switches the app from MOCK data to REAL Kite data."""
-        with self.refresh_lock:
-            if self.refresh_in_progress:
-                self.pending_refresh = True
-                return
-            self.refresh_in_progress = True
+        import kite_engine # Import your new real-data fetcher
+        import hawk_engine
+        from snapshot import snapshot_manager, cleanup_old_files
 
         selected_symbol = self.symbol_combo.currentText()
         selected_expiry = self.expiry_combo.currentText()
-        depth = max(3, min(6, self.strike_spin.value() + 2))
+        kite_inst = getattr(self, "kite_instance", None)
 
-        worker = threading.Thread(
-            target=self._background_refresh_worker,
-            args=(selected_symbol, selected_expiry, depth),
-            daemon=True,
+        real_market_data = kite_engine.fetch_real_market_data(
+            kite_inst,
+            symbol=selected_symbol,
+            expiry=selected_expiry,
         )
-        worker.start()
+
+        if real_market_data:
+            snapshot_manager.save(real_market_data)
+        else:
+            real_market_data = mock_generator.start_simulation_once()
+
+        self.market_data_ready.emit(real_market_data)
+
+        now = time.monotonic()
+        if now - self.last_pattern_check_ts >= 15:
+            hawk_engine.check_for_patterns()
+            self.last_pattern_check_ts = now
+
+        if now - self.last_cleanup_ts >= 300:
+            cleanup_old_files()
+            self.last_cleanup_ts = now
+
+        if self.current_interval_minutes > 0:
+            now_dt = datetime.now()
+            diff = (now_dt - self.last_milestone_time).total_seconds() / 60
+
+            if diff >= self.current_interval_minutes:
+                # 1. Freeze the data for the UI to display statically over the next interval
+                self.monitor_display_start_data = self.interval_reference_data
+                self.monitor_display_end_data = self.latest_market_data
+                
+                # 2. Generate Telegram alert based on this shift
+                self.generate_interval_report()
+                self.last_milestone_time = now_dt
+                # 3. Reset the background reference frame for the NEXT interval calculation
+                self.interval_reference_data = self.latest_market_data
+                self.render_latest_data()
 
     def manual_refresh(self):
         """Force an immediate data update without waiting for the 3-second timer."""
-        logger.info("Manual refresh triggered")
+        print("🔄 Manual refresh triggered...")
         self.run_engine_step()
 
     def update_interval_settings(self, text):
         if text == "OFF":
             self.current_interval_minutes = 0
+            self.interval_reference_data = None
+            self.monitor_display_start_data = None
+            self.monitor_display_end_data = None
         else:
             self.current_interval_minutes = int(text.split(" ")[0])
             self.last_milestone_time = datetime.now()
-            logger.info("Milestone interval set to %s minutes", self.current_interval_minutes)
+            self.interval_reference_data = self.latest_market_data
+            
+            # Attempt to instantly populate with historical data if available
+            target_dt = datetime.now() - timedelta(minutes=self.current_interval_minutes)
+            best_snap_data = None
+            snap_folder = config.SNAPSHOT_FOLDER
+            if os.path.exists(snap_folder):
+                files = [f for f in os.listdir(snap_folder) if f.startswith('snap_') and f.endswith('.json')]
+                files.sort(reverse=True) # Newest first
+                
+                for f in files:
+                    try:
+                        ts_str = f[5:20]
+                        snap_dt = datetime.strptime(ts_str, "%Y%m%d_%H%M%S")
+                        if snap_dt <= target_dt:
+                            # Ensure the snapshot isn't extremely outdated (max 2 minutes extra)
+                            if (target_dt - snap_dt) <= timedelta(minutes=2):
+                                with open(os.path.join(snap_folder, f), 'r', encoding='utf-8') as sf:
+                                    best_snap_data = json.load(sf).get("data")
+                            break
+                    except Exception:
+                        continue
+            
+            self.monitor_display_start_data = best_snap_data
+            self.monitor_display_end_data = self.latest_market_data if best_snap_data else None
+            print(f"Milestone interval set to {self.current_interval_minutes} minutes")
+            
+        self.render_latest_data()
 
     def generate_interval_report(self):
-        """Compares current price with the previous milestone."""
-        history = hawk_engine.get_history(limit=1)
-        if not history: return
+        """Compares current data with the reference memory snapshot."""
+        if not self.latest_market_data or not self.interval_reference_data: 
+            return
         
-        current_data = history[0]['data']
-        from snapshot import save_milestone
-        save_milestone(current_data, f"{self.current_interval_minutes}m")
-        
-        report_msg = hawk_engine.compare_milestones(current_data, self.current_interval_minutes)
+        report_msg = hawk_engine.compare_interval_data(
+            self.latest_market_data, self.interval_reference_data, self.current_interval_minutes
+        )
         if report_msg:
             from notifier import send_master_alert
-            send_master_alert(report_msg, symbol="MARKET", pattern=f"REPORT_{self.current_interval_minutes}M")
+            send_master_alert(report_msg, symbol="MARKET", pattern=f"{self.current_interval_minutes}M_UPDATE")
 
     def init_ui(self):
         # Main Container
@@ -152,25 +208,20 @@ class StockHawkDesktop(QMainWindow):
         # Create the Tab Widget
         self.tabs = QTabWidget()
         
-        # --- TAB 1: LIVE MARKET (Existing View) ---
-        self.live_market_tab = QWidget()
-        self.setup_live_market_tab()
-        self.tabs.addTab(self.live_market_tab, "Live Market")
+        # --- TAB 1: MARKET DASHBOARD ---
+        self.market_tab = QWidget()
+        self.setup_market_tab()
+        self.tabs.addTab(self.market_tab, "Market")
 
-        # --- TAB 2: MONITORING PAGE (New View) ---
-        self.monitoring_tab = QWidget()
-        self.setup_monitoring_tab()
-        self.tabs.addTab(self.monitoring_tab, "Monitoring")
-
-        # --- TAB 3: SETTINGS (API Integration) ---
+        # --- TAB 2: SETTINGS (API Integration) ---
         self.settings_tab = QWidget()
         self.setup_settings_tab()
         self.tabs.addTab(self.settings_tab, "Settings")
 
         self.main_layout.addWidget(self.tabs)
 
-    def setup_live_market_tab(self):
-        layout = QVBoxLayout(self.live_market_tab)
+    def setup_market_tab(self):
+        layout = QVBoxLayout(self.market_tab)
         layout.setSpacing(20)
 
         # --- CONTROL BAR ---
@@ -263,10 +314,16 @@ class StockHawkDesktop(QMainWindow):
         
         layout.addLayout(stats_layout)
 
-        # --- MAIN TABLE (Options Chain) ---
+        # --- SUB TABS (Live Chain vs Interval Monitor) ---
+        self.sub_tabs = QTabWidget()
+        
+        # 1. LIVE CHAIN SUB-TAB
+        self.chain_tab = QWidget()
+        chain_layout = QVBoxLayout(self.chain_tab)
+        
         self.chain_label = QLabel("Options Chain (Live)")
         self.chain_label.setStyleSheet("font-size: 18px; font-weight: bold; color: #00ff95;")
-        layout.addWidget(self.chain_label)
+        chain_layout.addWidget(self.chain_label)
 
         self.chain_table = QTableWidget(0, 7)
         self.chain_table.setHorizontalHeaderLabels([
@@ -276,7 +333,42 @@ class StockHawkDesktop(QMainWindow):
         self.chain_table.verticalHeader().setVisible(False)
         self.chain_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.chain_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        layout.addWidget(self.chain_table, stretch=2)
+        chain_layout.addWidget(self.chain_table)
+        self.sub_tabs.addTab(self.chain_tab, "Live Options Chain")
+
+        # 2. INTERVAL MONITOR SUB-TAB
+        self.monitor_tab = QWidget()
+        monitor_layout = QVBoxLayout(self.monitor_tab)
+        
+        self.monitor_label = QLabel("Interval Monitor: Changes Since Last Check")
+        self.monitor_label.setStyleSheet("font-size: 18px; font-weight: bold; color: #00ff95;")
+        monitor_layout.addWidget(self.monitor_label)
+
+        self.monitor_table = QTableWidget(0, 5)
+        self.monitor_table.setHorizontalHeaderLabels([
+            "CE OI Δ", "CE LTP Δ", "Strike", "PE LTP Δ", "PE OI Δ"
+        ])
+        self.monitor_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.monitor_table.verticalHeader().setVisible(False)
+        self.monitor_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.monitor_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        monitor_layout.addWidget(self.monitor_table)
+        self.sub_tabs.addTab(self.monitor_tab, "Interval Monitor")
+        
+        layout.addWidget(self.sub_tabs, stretch=3)
+
+        # --- ALERTS SECTION (Bottom of Market Page) ---
+        alerts_label = QLabel("Recent Pattern Hits & Alerts")
+        alerts_label.setStyleSheet("font-size: 16px; font-weight: bold;")
+        layout.addWidget(alerts_label)
+        
+        self.alerts_table = QTableWidget(0, 4)
+        self.alerts_table.setHorizontalHeaderLabels(["Time", "Symbol", "Pattern", "Message"])
+        self.alerts_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
+        self.alerts_table.verticalHeader().setVisible(False)
+        self.alerts_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.alerts_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        layout.addWidget(self.alerts_table, stretch=1)
 
     def refresh_expiry_list(self):
         """Dynamically changes expiry options based on the selected asset."""
@@ -290,37 +382,6 @@ class StockHawkDesktop(QMainWindow):
                 self.expiry_combo.addItems(all_dates[symbol])
         finally:
             self.expiry_combo.blockSignals(False)
-
-    def setup_monitoring_tab(self):
-        layout = QVBoxLayout(self.monitoring_tab)
-        layout.setSpacing(20)
-        
-        # Monitoring Page focuses only on key changes and reports
-        self.monitoring_label = QLabel("Interval-Based Trend Reports")
-        self.monitoring_label.setStyleSheet("font-size: 18px; font-weight: bold; color: #00ff95;")
-        layout.addWidget(self.monitoring_label)
-        
-        # Add a table specifically for monitoring changes across intervals
-        self.monitor_table = QTableWidget(0, 5)
-        self.monitor_table.setHorizontalHeaderLabels(["Interval", "NIFTY Change", "BANKNIFTY Change", "PCR", "Sentiment"])
-        self.monitor_table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
-        self.monitor_table.verticalHeader().setVisible(False)
-        self.monitor_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.monitor_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        layout.addWidget(self.monitor_table, stretch=2)
-
-        # Keep the Alerts Table at the bottom of this page too
-        alerts_label = QLabel("Recent Pattern Hits")
-        alerts_label.setStyleSheet("font-size: 16px; font-weight: bold;")
-        layout.addWidget(alerts_label)
-        
-        self.alerts_table = QTableWidget(0, 4)
-        self.alerts_table.setHorizontalHeaderLabels(["Time", "Symbol", "Pattern", "Message"])
-        self.alerts_table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
-        self.alerts_table.verticalHeader().setVisible(False)
-        self.alerts_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.alerts_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        layout.addWidget(self.alerts_table, stretch=1)
 
     def _get_or_create_item(self, table, row, col):
         """Helper to safely get or create table cells to avoid UI flickering."""
@@ -339,46 +400,6 @@ class StockHawkDesktop(QMainWindow):
             self.latest_market_data = market_data
 
         self.render_latest_data()
-
-        with self.refresh_lock:
-            self.refresh_in_progress = False
-            should_refresh_again = self.pending_refresh
-            self.pending_refresh = False
-
-        if should_refresh_again:
-            QTimer.singleShot(0, self.run_engine_step)
-
-    def _background_refresh_worker(self, symbol, expiry, depth):
-        import kite_engine
-        import hawk_engine
-        from snapshot import cleanup_old_files, snapshot_manager
-
-        market_data = None
-        try:
-            kite_inst = getattr(self, "kite_instance", None)
-            market_data = kite_engine.fetch_real_market_data(
-                kite_inst,
-                symbol=symbol,
-                expiry=expiry,
-            )
-
-            if market_data:
-                snapshot_manager.save(market_data)
-            else:
-                market_data = mock_generator.start_simulation_once()
-
-            now = time.monotonic()
-            if now - self.last_pattern_check_ts >= 15:
-                hawk_engine.check_for_patterns()
-                self.last_pattern_check_ts = now
-
-            if now - self.last_cleanup_ts >= 300:
-                cleanup_old_files()
-                self.last_cleanup_ts = now
-        except Exception as exc:
-            logger.error("Background refresh failed: %s", exc)
-        finally:
-            self.market_data_ready.emit(market_data)
 
     def render_latest_data(self):
         """Updates the live view from the cached market snapshot."""
@@ -417,7 +438,7 @@ class StockHawkDesktop(QMainWindow):
 
         if atm_index != -1:
             start = max(0, atm_index - num_strikes)
-            end = min(len(current_chain), atm_index + num_strikes)
+            end = min(len(current_chain), atm_index + num_strikes + 1)
             display_chain = current_chain[start:end]
         else:
             display_chain = current_chain
@@ -448,64 +469,82 @@ class StockHawkDesktop(QMainWindow):
                 font.setBold(bold)
                 item.setFont(font)
 
+        self.render_monitor_table(selected_symbol)
         self._refresh_auxiliary_tables_if_needed()
 
-    def _refresh_auxiliary_tables_if_needed(self):
-        """Avoids expensive file scans unless the monitoring tab is visible."""
-        if self.tabs.currentIndex() != 1:
+    def render_monitor_table(self, selected_symbol):
+        """Renders the static differences from the last completed interval."""
+        if not self.monitor_display_start_data or not self.monitor_display_end_data or selected_symbol not in self.monitor_display_end_data:
+            self.monitor_table.setRowCount(0)
+            if self.current_interval_minutes > 0:
+                self.monitor_label.setText(f"Interval Monitor: Waiting for first {self.current_interval_minutes}m interval to complete...")
+            else:
+                self.monitor_label.setText("Interval Monitor: OFF")
             return
+            
+        self.monitor_label.setText(f"{selected_symbol} Monitor - Difference over last {self.current_interval_minutes}m interval")
+        
+        end_chain = self.monitor_display_end_data[selected_symbol].get("optionsChain", [])
+        ref_chain = self.monitor_display_start_data.get(selected_symbol, {}).get("optionsChain", [])
+        
+        num_strikes = self.strike_spin.value()
+        atm_index = -1
+        for i, opt in enumerate(end_chain):
+            if opt.get("isATM"):
+                atm_index = i
+                break
 
+        if atm_index != -1:
+            start = max(0, atm_index - num_strikes)
+            end = min(len(end_chain), atm_index + num_strikes + 1)
+            display_chain = end_chain[start:end]
+        else:
+            display_chain = end_chain
+            
+        self.monitor_table.setRowCount(len(display_chain))
+        ref_map = {opt["strikePrice"]: opt for opt in ref_chain}
+        
+        for r, opt in enumerate(display_chain):
+            strike = opt["strikePrice"]
+            ref_opt = ref_map.get(strike)
+            
+            if ref_opt:
+                ce_oi_diff = opt["CE"]["OI"] - ref_opt["CE"]["OI"]
+                ce_ltp_diff = round(opt["CE"]["LTP"] - ref_opt["CE"]["LTP"], 2)
+                pe_ltp_diff = round(opt["PE"]["LTP"] - ref_opt["PE"]["LTP"], 2)
+                pe_oi_diff = opt["PE"]["OI"] - ref_opt["PE"]["OI"]
+            else:
+                ce_oi_diff = ce_ltp_diff = pe_ltp_diff = pe_oi_diff = 0
+
+            bg_color = QColor(0, 255, 149, 38) if opt.get("isATM") else QColor("#1a1a1a")
+            
+            ce_oi_str = f"{'+' if ce_oi_diff > 0 else ''}{ce_oi_diff}"
+            ce_ltp_str = f"{'+' if ce_ltp_diff > 0 else ''}{ce_ltp_diff:.2f}"
+            pe_ltp_str = f"{'+' if pe_ltp_diff > 0 else ''}{pe_ltp_diff:.2f}"
+            pe_oi_str = f"{'+' if pe_oi_diff > 0 else ''}{pe_oi_diff}"
+
+            cells_data = [
+                (ce_oi_str, QColor("#00ff95") if ce_oi_diff > 0 else (QColor("#ff4d4d") if ce_oi_diff < 0 else QColor("#e0e0e0"))),
+                (ce_ltp_str, QColor("#00ff95") if ce_ltp_diff > 0 else (QColor("#ff4d4d") if ce_ltp_diff < 0 else QColor("#e0e0e0"))),
+                (str(strike), QColor("#ffffff")),
+                (pe_ltp_str, QColor("#00ff95") if pe_ltp_diff > 0 else (QColor("#ff4d4d") if pe_ltp_diff < 0 else QColor("#e0e0e0"))),
+                (pe_oi_str, QColor("#00ff95") if pe_oi_diff > 0 else (QColor("#ff4d4d") if pe_oi_diff < 0 else QColor("#e0e0e0")))
+            ]
+            
+            for c, (text, fg_color) in enumerate(cells_data):
+                item = self._get_or_create_item(self.monitor_table, r, c)
+                item.setText(text)
+                item.setForeground(QBrush(fg_color))
+                item.setBackground(QBrush(bg_color))
+                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+
+    def _refresh_auxiliary_tables_if_needed(self):
         now_ts = time.monotonic()
-        if now_ts - self.last_aux_refresh_ts < 10:
+        if now_ts - self.last_aux_refresh_ts < 5:
             return
 
         self.refresh_alerts_table()
-        self.refresh_monitor_table()
         self.last_aux_refresh_ts = now_ts
-
-    def refresh_monitor_table(self):
-        """Populates the monitoring view with data from the milestones folder."""
-        milestone_folder = config.MILESTONE_FOLDER
-        if not os.path.exists(milestone_folder):
-            self.monitor_table.setRowCount(0)
-            return
-
-        # 1. Get all milestone files and sort them by modified time (newest first)
-        files = [os.path.join(milestone_folder, f) for f in os.listdir(milestone_folder) if f.endswith('.json')]
-        files.sort(key=os.path.getmtime, reverse=True)
-
-        self.monitor_table.setRowCount(len(files))
-        
-        for r, filepath in enumerate(files):
-            try:
-                with open(filepath, 'r') as f:
-                    content = json.load(f)
-                    m_type = content.get("type", "N/A")
-                    data = content.get("data", {})
-                    
-                    # 2. Extract specific values for the table
-                    # We'll calculate PCR on the fly using our engine
-                    metrics = hawk_engine.calculate_market_metrics(data.get("BANKNIFTY", {}).get("optionsChain", []))
-                    
-                    # 3. Create items for each column
-                    # Format: [Interval, NIFTY Price, BANKNIFTY Price, PCR, Sentiment]
-                    nifty_price = f"₹{data.get('NIFTY', {}).get('price', 0)}"
-                    bn_price = f"₹{data.get('BANKNIFTY', {}).get('price', 0)}"
-                    
-                    display_data = [
-                        m_type, nifty_price, bn_price, 
-                        str(metrics['pcr']), metrics['sentiment']
-                    ]
-                    
-                    for c, text in enumerate(display_data):
-                        item = self._get_or_create_item(self.monitor_table, r, c)
-                        item.setText(text)
-                        # Optional: Color code the sentiment
-                        if c == 4:
-                            color = QColor("#00ff95") if "Bullish" in text else QColor("#ff4d4d")
-                            item.setForeground(QBrush(color))
-            except Exception as e:
-                logger.error("Error loading milestone %s: %s", os.path.basename(filepath), e)
 
     def refresh_alerts_table(self):
         """Reads alert.csv and updates the bottom table."""
