@@ -21,9 +21,23 @@ from snapshot import cleanup_old_files
 
 class StockHawkDesktop(QMainWindow):
     market_data_ready = pyqtSignal(object)
+
+    ICONS = {
+        "app": "🦅",
+        "refresh": "🔄",
+        "login": "🔑",
+        "chain": "📈",
+        "connected": "🟢",
+        "monitor": "🧭",
+        "alerts": "🚨",
+        "settings": "⚙",
+        "stats": "📊",
+        "sentiment": "💬",
+    }
+
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("🦅 StockHawk Desktop Terminal")
+        self.setWindowTitle(f"{self.ICONS['app']} StockHawk Desktop Terminal")
         self.resize(1000, 750)
         
         self.kite_auth = KiteAuthenticator()
@@ -66,6 +80,10 @@ class StockHawkDesktop(QMainWindow):
         if self.kite_auth.load_token():
             self.auth_status.setText("Status: Authenticated ✅ (Loaded)")
             self.kite_instance = self.kite_auth.kite
+
+    def _icon_text(self, icon_key, text):
+        icon = self.ICONS.get(icon_key, "")
+        return f"{icon} {text}".strip()
 
     def update_clock(self):
         """Updates the real-time clock display."""
@@ -267,17 +285,17 @@ class StockHawkDesktop(QMainWindow):
         # --- TAB 1: LIVE MARKET (Existing View) ---
         self.live_market_tab = QWidget()
         self.setup_live_market_tab()
-        self.tabs.addTab(self.live_market_tab, "Live Market")
+        self.tabs.addTab(self.live_market_tab, "📡 Live Market")
 
         # --- TAB 2: MONITORING PAGE (New View) ---
         self.monitoring_tab = QWidget()
         self.setup_monitoring_tab()
-        self.tabs.addTab(self.monitoring_tab, "Monitoring")
+        self.tabs.addTab(self.monitoring_tab, "🧭 Monitoring")
 
         # --- TAB 3: SETTINGS (API Integration) ---
         self.settings_tab = QWidget()
         self.setup_settings_tab()
-        self.tabs.addTab(self.settings_tab, "Settings")
+        self.tabs.addTab(self.settings_tab, "⚙ Settings")
 
         self.tabs.currentChanged.connect(self.on_tab_changed)
 
@@ -297,14 +315,14 @@ class StockHawkDesktop(QMainWindow):
         status_light.setStyleSheet("background-color: #00ff95; border-radius: 7px;")
         control_layout.addWidget(status_light)
         
-        status_label = QLabel("CONNECTED")
+        status_label = QLabel(self._icon_text("connected", "CONNECTED"))
         status_label.setStyleSheet("color: #00ff95; font-weight: bold;")
         control_layout.addWidget(status_label)
         
         control_layout.addSpacing(20)
         
         # Snapshot Control
-        control_layout.addWidget(QLabel("Snapshots:"))
+        control_layout.addWidget(QLabel("📸 Snapshots:"))
         self.snap_spin = QSpinBox()
         self.snap_spin.setRange(1, 100)
         self.snap_spin.setValue(10)
@@ -312,14 +330,14 @@ class StockHawkDesktop(QMainWindow):
         control_layout.addWidget(self.snap_spin)
         
         # Interval Selection
-        control_layout.addWidget(QLabel("Monitoring:"))
+        control_layout.addWidget(QLabel("⏱ Monitoring:"))
         self.interval_combo = QComboBox()
         self.interval_combo.addItems(["OFF", "1 Min", "5 Min", "15 Min"])
         self.interval_combo.currentTextChanged.connect(self.update_interval_settings)
         control_layout.addWidget(self.interval_combo)
         
         # Strike Count Control
-        control_layout.addWidget(QLabel("Strikes:"))
+        control_layout.addWidget(QLabel("🎯 Strikes:"))
         self.strike_spin = QSpinBox()
         self.strike_spin.setRange(1, 10) # Min 3, Max 10
         self.strike_spin.setValue(1) # Default to your current view
@@ -339,10 +357,10 @@ class StockHawkDesktop(QMainWindow):
         self.refresh_expiry_list() # Populate initially based on default symbol
         
         # Option Chain Button
-        btn_chain = QPushButton("OPTION CHAIN")
+        btn_chain = QPushButton(self._icon_text("chain", "OPTION CHAIN"))
         control_layout.addWidget(btn_chain)
         
-        self.refresh_btn = QPushButton("🔄 REFRESH")
+        self.refresh_btn = QPushButton(self._icon_text("refresh", "REFRESH"))
         self.refresh_btn.setStyleSheet("""
             QPushButton { 
                 background-color: #00ff95; color: black; font-weight: bold; 
@@ -364,8 +382,8 @@ class StockHawkDesktop(QMainWindow):
 
         # --- STATS BAR ---
         stats_layout = QHBoxLayout()
-        self.pcr_label = QLabel("PCR: 0.00")
-        self.sentiment_label = QLabel("Sentiment: Neutral")
+        self.pcr_label = QLabel(self._icon_text("stats", "PCR") + ": 0.00")
+        self.sentiment_label = QLabel(self._icon_text("sentiment", "Sentiment") + ": Neutral")
         self.pcr_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #00ff95;")
         self.sentiment_label.setStyleSheet("font-size: 16px; font-weight: bold; color: #ffffff;")
         
@@ -405,7 +423,7 @@ class StockHawkDesktop(QMainWindow):
         layout.setSpacing(20)
         
         # Monitoring Page focuses only on key changes and reports
-        self.monitoring_label = QLabel("Interval-Based Trend Reports")
+        self.monitoring_label = QLabel(self._icon_text("monitor", "Interval-Based Trend Reports"))
         self.monitoring_label.setStyleSheet("font-size: 18px; font-weight: bold; color: #00ff95;")
         layout.addWidget(self.monitoring_label)
         
@@ -419,7 +437,7 @@ class StockHawkDesktop(QMainWindow):
         layout.addWidget(self.monitor_table, stretch=2)
 
         # Keep the Alerts Table at the bottom of this page too
-        alerts_label = QLabel("Recent Pattern Hits")
+        alerts_label = QLabel(self._icon_text("alerts", "Recent Pattern Hits"))
         alerts_label.setStyleSheet("font-size: 16px; font-weight: bold;")
         layout.addWidget(alerts_label)
         
@@ -652,7 +670,7 @@ class StockHawkDesktop(QMainWindow):
     def setup_settings_tab(self):
         layout = QVBoxLayout(self.settings_tab)
         
-        layout.addWidget(QLabel("Kite Zerodha API Settings"))
+        layout.addWidget(QLabel(self._icon_text("settings", "Kite Zerodha API Settings")))
         
         self.api_key_input = QLineEdit()
         self.api_key_input.setPlaceholderText("Enter API Key")
@@ -664,7 +682,7 @@ class StockHawkDesktop(QMainWindow):
         self.api_secret_input.setEchoMode(QLineEdit.EchoMode.Password)
         layout.addWidget(self.api_secret_input)
         
-        self.login_btn = QPushButton("🔑 LOGIN TO KITE")
+        self.login_btn = QPushButton(self._icon_text("login", "LOGIN TO KITE"))
         self.login_btn.clicked.connect(self.handle_kite_login)
         layout.addWidget(self.login_btn)
         
@@ -687,6 +705,7 @@ class StockHawkDesktop(QMainWindow):
             if access_token:
                 self.auth_status.setText("Status: Authenticated ✅")
                 self.kite_instance = self.kite_auth.kite
+                self.run_engine_step()
 
     def setup_live_market_tab(self):
         layout = QVBoxLayout(self.live_market_tab)
@@ -736,10 +755,10 @@ class StockHawkDesktop(QMainWindow):
         control_layout.addWidget(self.expiry_combo)
         self.refresh_expiry_list()
 
-        btn_chain = QPushButton("OPTION CHAIN")
+        btn_chain = QPushButton(self._icon_text("chain", "OPTION CHAIN"))
         control_layout.addWidget(btn_chain)
 
-        self.refresh_btn = QPushButton("REFRESH")
+        self.refresh_btn = QPushButton(self._icon_text("refresh", "REFRESH"))
         self.refresh_btn.setStyleSheet(
             """
             QPushButton {
@@ -771,7 +790,7 @@ class StockHawkDesktop(QMainWindow):
         stats_layout.addStretch()
         layout.addLayout(stats_layout)
 
-        self.chain_label = QLabel("Options Chain (Live)")
+        self.chain_label = QLabel(self._icon_text("chain", "Options Chain (Live)"))
         self.chain_label.setStyleSheet("font-size: 18px; font-weight: bold; color: #00ff95;")
         layout.addWidget(self.chain_label)
 
@@ -881,7 +900,7 @@ class StockHawkDesktop(QMainWindow):
 
     def manual_refresh(self):
         """Force an immediate data update without waiting for the timer."""
-        print("Manual refresh triggered...")
+        print("🔄 Manual refresh triggered...")
         self.run_engine_step()
 
     def render_latest_data(self):
@@ -897,10 +916,10 @@ class StockHawkDesktop(QMainWindow):
         current_chain = live_data[selected_symbol].get("optionsChain", [])
         metrics = hawk_engine.calculate_market_metrics(current_chain)
         self.chain_label.setText(
-            f"{selected_symbol} Options Chain (Live) - {self._format_currency(live_data[selected_symbol]['price'])}"
+            f"{self._icon_text('chain', f'{selected_symbol} Options Chain (Live)')} - {self._format_currency(live_data[selected_symbol]['price'])}"
         )
-        self.pcr_label.setText(f"PCR: {metrics['pcr']}")
-        self.sentiment_label.setText(f"Sentiment: {metrics['sentiment']}")
+        self.pcr_label.setText(f"{self._icon_text('stats', 'PCR')}: {metrics['pcr']}")
+        self.sentiment_label.setText(f"{self._icon_text('sentiment', 'Sentiment')}: {metrics['sentiment']}")
 
         if self.previous_market_data and selected_symbol in self.previous_market_data:
             old_oi_map = {
